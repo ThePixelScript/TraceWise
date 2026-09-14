@@ -1,0 +1,54 @@
+[
+  {
+    "scenario_id": "CHANGE-001",
+    "description": "Authentication failure response changes from HTTP 401 to HTTP 403 Forbidden. The status code constant and all return statements using it must be updated.",
+    "changed_artifacts": [
+      "src/auth/service.py#AuthenticationService.authenticate_user"
+    ],
+    "expected_impacted_artifacts": [
+      "tests/test_authentication.py#test_invalid_password_returns_401",
+      "tests/test_authentication.py#test_unknown_user_returns_401",
+      "tests/test_authentication.py#test_rate_limited_user_is_blocked"
+    ],
+    "expected_impacted_requirements": [
+      "REQ-003"
+    ]
+  },
+  {
+    "scenario_id": "CHANGE-002",
+    "description": "Token format changes from 'user_id:expiry:signature' to a JSON-based encoding. Both generation and decoding logic must be updated.",
+    "changed_artifacts": [
+      "src/auth/token.py#generate_token",
+      "src/auth/token.py#decode_token"
+    ],
+    "expected_impacted_artifacts": [
+      "src/auth/token.py#is_token_expired",
+      "tests/test_tokens.py#test_token_generation",
+      "tests/test_tokens.py#test_token_decode_roundtrip",
+      "tests/test_tokens.py#test_token_contains_expiry",
+      "tests/test_tokens.py#test_invalid_token_format_raises",
+      "tests/test_tokens.py#test_expired_token",
+      "tests/test_tokens.py#test_valid_token_not_expired"
+    ],
+    "expected_impacted_requirements": [
+      "REQ-004",
+      "REQ-005"
+    ]
+  },
+  {
+    "scenario_id": "CHANGE-003",
+    "description": "Password hashing algorithm changes from SHA-256 to SHA-512. The hash_password and verify_password functions must be updated, and all existing stored hashes become invalid.",
+    "changed_artifacts": [
+      "src/auth/password.py#hash_password",
+      "src/auth/password.py#verify_password"
+    ],
+    "expected_impacted_artifacts": [
+      "src/auth/service.py#AuthenticationService.authenticate_user",
+      "tests/test_authentication.py#test_successful_login",
+      "tests/test_authentication.py#test_invalid_password_returns_401"
+    ],
+    "expected_impacted_requirements": [
+      "REQ-008"
+    ]
+  }
+]
