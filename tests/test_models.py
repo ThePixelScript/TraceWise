@@ -170,44 +170,132 @@ class TestArtifact:
 
 
 class TestArtifactChunk:
-    def test_artifact_chunk_creation(self):
+    def test_artifact_chunk_creation_minimal(self):
         chunk = ArtifactChunk(
-            id="SRC-auth.py#login",
-            artifact_id="SRC-auth.py",
-            content=(
-                "def login(username, password):\n"
-                "    return authenticate(username, password)"
-            ),
-            metadata={"start_line": 10, "end_line": 12},
+            id="src/auth.py#login",
+            parent_id="src/auth.py",
+            name="login",
+            raw_content="def login():\n    pass\n",
+            content="def login():\n    pass\n",
+            start_line=1,
+            end_line=2,
         )
-        assert chunk.id == "SRC-auth.py#login"
-        assert chunk.artifact_id == "SRC-auth.py"
-        assert chunk.metadata["start_line"] == 10
+        assert chunk.id == "src/auth.py#login"
+        assert chunk.parent_id == "src/auth.py"
+        assert chunk.name == "login"
+        assert chunk.raw_content == "def login():\n    pass\n"
+        assert chunk.content == "def login():\n    pass\n"
+        assert chunk.start_line == 1
+        assert chunk.end_line == 2
+        assert chunk.metadata == {}
 
-    def test_artifact_chunk_empty_id_raises(self):
+    def test_artifact_chunk_creation_with_metadata(self):
+        chunk = ArtifactChunk(
+            id="src/auth.py#AuthService.login",
+            parent_id="src/auth.py#AuthService",
+            name="login",
+            raw_content="def login(self): pass",
+            content="def login(self): pass",
+            start_line=10,
+            end_line=10,
+            metadata={"chunk_type": "method", "is_async": False, "docstring": ""},
+        )
+        assert chunk.id == "src/auth.py#AuthService.login"
+        assert chunk.parent_id == "src/auth.py#AuthService"
+        assert chunk.metadata["chunk_type"] == "method"
+        assert chunk.metadata["is_async"] is False
+
+    def test_artifact_chunk_whitespace_identifiers_stripped(self):
+        chunk = ArtifactChunk(
+            id="  src/auth.py#login  ",
+            parent_id="  src/auth.py  ",
+            name="  login  ",
+            raw_content="def login(): pass",
+            content="def login(): pass",
+            start_line=1,
+            end_line=1,
+        )
+        assert chunk.id == "src/auth.py#login"
+        assert chunk.parent_id == "src/auth.py"
+        assert chunk.name == "login"
+
+    def test_artifact_chunk_empty_identifiers_raise(self):
+        valid_kwargs = {
+            "id": "src/auth.py#login",
+            "parent_id": "src/auth.py",
+            "name": "login",
+            "raw_content": "def login(): pass",
+            "content": "def login(): pass",
+            "start_line": 1,
+            "end_line": 1,
+        }
+        for field in ("id", "parent_id", "name"):
+            with pytest.raises(ValidationError):
+                ArtifactChunk(**{**valid_kwargs, field: ""})
+            with pytest.raises(ValidationError):
+                ArtifactChunk(**{**valid_kwargs, field: "   "})
+
+    def test_artifact_chunk_invalid_start_line_raises(self):
         with pytest.raises(ValidationError):
             ArtifactChunk(
-                id="",
-                artifact_id="SRC-auth.py",
-                content="def test(): pass",
+                id="src/auth.py#login",
+                parent_id="src/auth.py",
+                name="login",
+                raw_content="def login(): pass",
+                content="def login(): pass",
+                start_line=0,
+                end_line=1,
             )
 
+    def test_artifact_chunk_end_line_before_start_line_raises(self):
         with pytest.raises(ValidationError):
             ArtifactChunk(
-                id="SRC-auth.py#test",
-                artifact_id="",
-                content="def test(): pass",
+                id="src/auth.py#login",
+                parent_id="src/auth.py",
+                name="login",
+                raw_content="def login(): pass",
+                content="def login(): pass",
+                start_line=5,
+                end_line=4,
+            )
+
+    def test_artifact_chunk_extra_fields_forbidden(self):
+        with pytest.raises(ValidationError):
+            ArtifactChunk(
+                id="src/auth.py#login",
+                parent_id="src/auth.py",
+                name="login",
+                raw_content="def login(): pass",
+                content="def login(): pass",
+                start_line=1,
+                end_line=1,
+                extra_field="disallowed",
             )
 
     def test_artifact_chunk_serialization_roundtrip(self):
         chunk = ArtifactChunk(
-            id="REQ-001#sec1",
-            artifact_id="REQ-001",
-            content="Section 1: Authentication Requirements",
+            id="src/auth.py#login",
+            parent_id="src/auth.py",
+            name="login",
+            raw_content="def login(): pass",
+            content="def login(): pass",
+            start_line=1,
+            end_line=1,
+            metadata={
+                "chunk_type": "function",
+                "is_async": False,
+                "docstring": "Login.",
+            },
         )
         json_str = chunk.model_dump_json()
         reconstructed = ArtifactChunk.model_validate_json(json_str)
         assert reconstructed == chunk
+        dumped = chunk.model_dump()
+        assert dumped["id"] == "src/auth.py#login"
+        assert dumped["parent_id"] == "src/auth.py"
+        assert dumped["name"] == "login"
+        assert dumped["start_line"] == 1
+        assert dumped["end_line"] == 1
 
 
 class TestTraceLinkStatus:

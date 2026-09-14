@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from tracewise.models.artifact_chunk import ArtifactChunk
+
 
 class ArtifactType(str, Enum):
     """Supported software artifact types."""
@@ -44,20 +46,4 @@ class Artifact(BaseModel):
         return cleaned
 
 
-class ArtifactChunk(BaseModel):
-    """A segment or sub-unit of an artifact (e.g. section, function, test method)."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    id: str
-    artifact_id: str
-    content: str
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-    @field_validator("id", "artifact_id")
-    @classmethod
-    def validate_non_empty(cls, v: str) -> str:
-        cleaned = v.strip()
-        if not cleaned:
-            raise ValueError("Field cannot be empty.")
-        return cleaned
+__all__ = ["Artifact", "ArtifactChunk", "ArtifactType"]
