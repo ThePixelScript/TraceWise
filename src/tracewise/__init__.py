@@ -3,10 +3,15 @@
 from tracewise.ingestion import (
     AmbiguousRuleError,
     ArtifactIngestor,
+    BaseChunker,
+    ChunkingError,
     IngestionEncodingError,
     IngestionError,
     IngestionFileError,
     IngestionRule,
+    PythonChunker,
+    PythonParsingError,
+    UnsupportedArtifactTypeError,
     normalize_posix_path,
 )
 from tracewise.models import (
@@ -25,12 +30,17 @@ __all__ = [
     "ArtifactChunk",
     "ArtifactIngestor",
     "ArtifactType",
+    "BaseChunker",
+    "ChunkingError",
     "IngestionEncodingError",
     "IngestionError",
     "IngestionFileError",
     "IngestionRule",
+    "PythonChunker",
+    "PythonParsingError",
     "TraceLink",
     "TraceLinkStatus",
+    "UnsupportedArtifactTypeError",
     "__version__",
     "normalize_posix_path",
 ]

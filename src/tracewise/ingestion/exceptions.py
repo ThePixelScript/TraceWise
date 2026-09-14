@@ -1,4 +1,4 @@
-"""Exceptions for the TraceWise artifact ingestion pipeline."""
+"""Exceptions for the TraceWise artifact ingestion and chunking pipeline."""
 
 
 class IngestionError(Exception):
@@ -15,3 +15,15 @@ class IngestionEncodingError(IngestionError):
 
 class AmbiguousRuleError(IngestionError):
     """Raised when a file matches multiple conflicting ingestion rules."""
+
+
+class ChunkingError(Exception):
+    """Base exception for all artifact chunking failures."""
+
+
+class UnsupportedArtifactTypeError(ChunkingError):
+    """Raised when an artifact type or file extension is not supported for chunking."""
+
+
+class PythonParsingError(ChunkingError):
+    """Raised when Python AST parsing fails or AST node line metadata is invalid."""
