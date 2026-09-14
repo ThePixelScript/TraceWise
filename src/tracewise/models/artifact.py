@@ -29,7 +29,9 @@ class Artifact(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str
-    type: ArtifactType
+    artifact_type: ArtifactType
+    file_path: str
+    raw_content: str
     content: str
     metadata: dict[str, Any] = Field(default_factory=dict)
 

@@ -29,32 +29,43 @@ class TestArtifactType:
 
 
 class TestArtifact:
-    def test_artifact_creation_minimal(self):
+    def test_artifact_creation_all_required_fields(self):
         artifact = Artifact(
             id="REQ-001",
-            type=ArtifactType.REQUIREMENT,
+            artifact_type=ArtifactType.REQUIREMENT,
+            file_path="docs/reqs.md",
+            raw_content="The system shall authenticate users via OAuth2.",
             content="The system shall authenticate users via OAuth2.",
         )
         assert artifact.id == "REQ-001"
-        assert artifact.type == ArtifactType.REQUIREMENT
+        assert artifact.artifact_type == ArtifactType.REQUIREMENT
+        assert artifact.file_path == "docs/reqs.md"
+        assert artifact.raw_content == (
+            "The system shall authenticate users via OAuth2."
+        )
         assert artifact.content == "The system shall authenticate users via OAuth2."
         assert artifact.metadata == {}
 
     def test_artifact_creation_with_metadata(self):
         artifact = Artifact(
-            id="SRC-auth.py",
-            type="source_code",
+            id="src/auth.py",
+            artifact_type=ArtifactType.SOURCE_CODE,
+            file_path="src/auth.py",
+            raw_content="def login(): pass",
             content="def login(): pass",
-            metadata={"path": "src/auth.py", "language": "python"},
+            metadata={"language": "python"},
         )
-        assert artifact.id == "SRC-auth.py"
-        assert artifact.type == ArtifactType.SOURCE_CODE
-        assert artifact.metadata["path"] == "src/auth.py"
+        assert artifact.id == "src/auth.py"
+        assert artifact.artifact_type == ArtifactType.SOURCE_CODE
+        assert artifact.file_path == "src/auth.py"
+        assert artifact.metadata["language"] == "python"
 
     def test_artifact_id_stripped(self):
         artifact = Artifact(
             id="  REQ-002  ",
-            type=ArtifactType.REQUIREMENT,
+            artifact_type=ArtifactType.REQUIREMENT,
+            file_path="docs/reqs.md",
+            raw_content="Some requirement",
             content="Some requirement",
         )
         assert artifact.id == "REQ-002"
@@ -63,14 +74,18 @@ class TestArtifact:
         with pytest.raises(ValidationError):
             Artifact(
                 id="",
-                type=ArtifactType.REQUIREMENT,
+                artifact_type=ArtifactType.REQUIREMENT,
+                file_path="docs/reqs.md",
+                raw_content="Valid content",
                 content="Valid content",
             )
 
         with pytest.raises(ValidationError):
             Artifact(
                 id="   ",
-                type=ArtifactType.REQUIREMENT,
+                artifact_type=ArtifactType.REQUIREMENT,
+                file_path="docs/reqs.md",
+                raw_content="Valid content",
                 content="Valid content",
             )
 
@@ -78,7 +93,9 @@ class TestArtifact:
         with pytest.raises(ValidationError):
             Artifact(
                 id="REQ-003",
-                type="INVALID_TYPE",
+                artifact_type="INVALID_TYPE",
+                file_path="docs/reqs.md",
+                raw_content="Some requirement",
                 content="Some requirement",
             )
 
@@ -86,7 +103,9 @@ class TestArtifact:
         with pytest.raises(ValidationError):
             Artifact(
                 id="REQ-004",
-                type=ArtifactType.REQUIREMENT,
+                artifact_type=ArtifactType.REQUIREMENT,
+                file_path="docs/reqs.md",
+                raw_content="Some content",
                 content="Some content",
                 unknown_attribute="not_allowed",
             )
@@ -94,18 +113,60 @@ class TestArtifact:
     def test_artifact_serialization_roundtrip(self):
         artifact = Artifact(
             id="TC-101",
-            type=ArtifactType.TEST_CASE,
+            artifact_type=ArtifactType.TEST_CASE,
+            file_path="tests/test_auth.py",
+            raw_content="def test_oauth_flow(): assert True",
             content="def test_oauth_flow(): assert True",
             metadata={"framework": "pytest"},
         )
         data = artifact.model_dump()
         assert data["id"] == "TC-101"
-        assert data["type"] == ArtifactType.TEST_CASE
+        assert data["artifact_type"] == ArtifactType.TEST_CASE
+        assert data["file_path"] == "tests/test_auth.py"
+        assert data["raw_content"] == "def test_oauth_flow(): assert True"
+        assert data["content"] == "def test_oauth_flow(): assert True"
         assert data["metadata"]["framework"] == "pytest"
 
         json_str = artifact.model_dump_json()
         reconstructed = Artifact.model_validate_json(json_str)
         assert reconstructed == artifact
+
+    def test_missing_file_path_raises_validation_error(self):
+        with pytest.raises(ValidationError, match="file_path"):
+            Artifact(
+                id="REQ-005",
+                artifact_type=ArtifactType.REQUIREMENT,
+                raw_content="Content",
+                content="Content",
+            )
+
+    def test_missing_raw_content_raises_validation_error(self):
+        with pytest.raises(ValidationError, match="raw_content"):
+            Artifact(
+                id="REQ-006",
+                artifact_type=ArtifactType.REQUIREMENT,
+                file_path="docs/reqs.md",
+                content="Content",
+            )
+
+    def test_missing_content_raises_validation_error(self):
+        with pytest.raises(ValidationError, match="content"):
+            Artifact(
+                id="REQ-007",
+                artifact_type=ArtifactType.REQUIREMENT,
+                file_path="docs/reqs.md",
+                raw_content="Content",
+            )
+
+    def test_legacy_type_field_forbidden(self):
+        with pytest.raises(ValidationError):
+            Artifact(
+                id="REQ-008",
+                type=ArtifactType.REQUIREMENT,
+                file_path="docs/reqs.md",
+                raw_content="Content",
+                content="Content",
+            )
 
 
 class TestArtifactChunk:
