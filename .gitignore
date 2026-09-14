@@ -8,6 +8,7 @@ venv/
 
 # Testing
 .pytest_cache/
+.ruff_cache/
 .coverage
 htmlcov/
 

@@ -1,3 +1,14 @@
+Metadata-Version: 2.4
+Name: tracewise
+Version: 0.1.0
+Summary: Automated software traceability and change impact analysis platform
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: pydantic>=2.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: ruff>=0.4; extra == "dev"
+
 # TraceWise
 
 An intelligent platform for automated requirements traceability and change impact analysis across software artifacts.
