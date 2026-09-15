@@ -3,7 +3,8 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
-from tracewise.retrieval.models import ProcessedText, RetrievalCandidate
+from tracewise.preprocessing.models import ProcessedText
+from tracewise.retrieval.models import RetrievalCandidate
 
 
 class BaseRetriever(ABC):

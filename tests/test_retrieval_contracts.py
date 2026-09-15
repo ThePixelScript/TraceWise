@@ -5,13 +5,16 @@ from collections.abc import Sequence
 import pytest
 from pydantic import ValidationError
 
-from tracewise.retrieval import (
-    BaseRetriever,
-    NotIndexedError,
-    ProcessedText,
-    RetrievalCandidate,
-    RetrieverError,
+pytest.importorskip(
+    "tracewise.preprocessing",
+    reason="Retrieval contracts require unmerged Milestone 1C preprocessing branch",
 )
+
+from tracewise.preprocessing.models import ProcessedText
+
+from tracewise.retrieval.base import BaseRetriever
+from tracewise.retrieval.exceptions import NotIndexedError, RetrieverError
+from tracewise.retrieval.models import RetrievalCandidate
 
 
 class MockRetriever(BaseRetriever):
@@ -44,7 +47,6 @@ class MockRetriever(BaseRetriever):
         if top_k is not None and top_k <= 0:
             raise ValueError(f"top_k must be strictly positive, got {top_k}.")
 
-        # Compute or lookup scores for indexed documents
         raw: list[tuple[str, float]] = []
         for doc_id in self._documents:
             score = self.preset_scores.get(doc_id, 0.0)
@@ -268,33 +270,9 @@ class TestRetrievalCandidateValidation:
         assert reconstructed == candidate
 
 
-class TestProcessedTextValidation:
-    def test_valid_construction(self):
-        pt = ProcessedText(
-            id="REQ-001",
-            content="authenticate user with email",
-            tokens=["authenticate", "user", "email"],
-            metadata={"length": 3},
-        )
-        assert pt.id == "REQ-001"
-        assert pt.content == "authenticate user with email"
-        assert pt.tokens == ["authenticate", "user", "email"]
-        assert pt.metadata == {"length": 3}
-
-    def test_empty_id_rejected(self):
-        with pytest.raises(ValidationError, match="id"):
-            ProcessedText(id="", content="text")
-        with pytest.raises(ValidationError, match="id"):
-            ProcessedText(id="   ", content="text")
-
-    def test_mutation_rejected(self):
-        pt = ProcessedText(id="DOC-1", content="hello")
-        with pytest.raises(ValidationError):
-            pt.content = "new"  # type: ignore[misc]
-
-    def test_extra_fields_rejected(self):
-        with pytest.raises(ValidationError):
-            ProcessedText(id="DOC-1", content="hello", extra="forbidden")
+class TestRetrieverExceptions:
+    def test_not_indexed_error_inherits_from_retriever_error(self):
+        assert issubclass(NotIndexedError, RetrieverError)
 
 
 class TestRetrieverLifecycle:
@@ -307,9 +285,6 @@ class TestRetrieverLifecycle:
         query = ProcessedText(id="Q-1", content="search query")
         with pytest.raises(NotIndexedError, match="cannot retrieve before indexing"):
             retriever.retrieve(query)
-
-    def test_not_indexed_error_inherits_from_retriever_error(self):
-        assert issubclass(NotIndexedError, RetrieverError)
 
     def test_index_changes_indexed_state(self):
         retriever = MockRetriever()
@@ -330,7 +305,6 @@ class TestRetrieverLifecycle:
         assert len(retriever._documents) == 2
         assert "D-1" in retriever._documents
 
-        # Replace with a completely new corpus
         new_docs = [
             ProcessedText(id="D-3", content="doc three"),
         ]

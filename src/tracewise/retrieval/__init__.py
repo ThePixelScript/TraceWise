@@ -2,12 +2,11 @@
 
 from tracewise.retrieval.base import BaseRetriever
 from tracewise.retrieval.exceptions import NotIndexedError, RetrieverError
-from tracewise.retrieval.models import ProcessedText, RetrievalCandidate
+from tracewise.retrieval.models import RetrievalCandidate
 
 __all__ = [
     "BaseRetriever",
     "NotIndexedError",
-    "ProcessedText",
     "RetrievalCandidate",
     "RetrieverError",
 ]

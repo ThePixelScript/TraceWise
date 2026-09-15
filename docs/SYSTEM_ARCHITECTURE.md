@@ -77,8 +77,8 @@ This overlap allows retrieval strategies to evaluate coarse-grained conceptual u
 
 ### 1. Scope & Package Location
 The retrieval contracts reside in `src/tracewise/retrieval/`:
-- `models.py`: `RetrievalCandidate`, `ProcessedText`
-- `base.py`: `BaseRetriever` abstract base class
+- `models.py`: `RetrievalCandidate`
+- `base.py`: `BaseRetriever` abstract base class (imports `ProcessedText` from `tracewise.preprocessing.models`)
 - `exceptions.py`: `RetrieverError`, `NotIndexedError`
 
 ### 2. Architectural Flow

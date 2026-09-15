@@ -21,13 +21,6 @@ from tracewise.models import (
     TraceLink,
     TraceLinkStatus,
 )
-from tracewise.retrieval import (
-    BaseRetriever,
-    NotIndexedError,
-    ProcessedText,
-    RetrievalCandidate,
-    RetrieverError,
-)
 
 __version__ = "0.1.0"
 
@@ -38,18 +31,13 @@ __all__ = [
     "ArtifactIngestor",
     "ArtifactType",
     "BaseChunker",
-    "BaseRetriever",
     "ChunkingError",
     "IngestionEncodingError",
     "IngestionError",
     "IngestionFileError",
     "IngestionRule",
-    "NotIndexedError",
-    "ProcessedText",
     "PythonChunker",
     "PythonParsingError",
-    "RetrievalCandidate",
-    "RetrieverError",
     "TraceLink",
     "TraceLinkStatus",
     "UnsupportedArtifactTypeError",

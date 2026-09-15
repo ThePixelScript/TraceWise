@@ -6,25 +6,6 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-class ProcessedText(BaseModel):
-    """A unit of preprocessed text consumed by retrieval algorithms."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    id: str
-    content: str
-    tokens: list[str] = Field(default_factory=list)
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-    @field_validator("id")
-    @classmethod
-    def validate_id(cls, v: str) -> str:
-        cleaned = v.strip()
-        if not cleaned:
-            raise ValueError("ProcessedText id cannot be empty.")
-        return cleaned
-
-
 class RetrievalCandidate(BaseModel):
     """A candidate traceability link produced by a retriever."""
 
