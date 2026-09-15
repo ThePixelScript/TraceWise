@@ -80,3 +80,15 @@ def test_rate_limited_user_is_blocked():
     result = service.authenticate_user("alice@example.com", "correct-password")
     assert result.success is False, "Expected blocked user to be rejected"
     assert result.status_code == 401, "Expected HTTP 401 for rate-limited user"
+
+
+def test_password_is_hashed_not_stored_plaintext():
+    """Verify that password storage does not contain the plaintext password."""
+    plaintext = "correct-password"
+    store = _build_user_store("alice@example.com", plaintext)
+
+    stored_hash = store["alice@example.com"]["password_hash"]
+
+    assert stored_hash != plaintext
+    assert ":" in stored_hash
+    assert len(stored_hash.split(":")) == 2

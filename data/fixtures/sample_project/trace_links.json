@@ -6,11 +6,6 @@
   },
   {
     "requirement_id": "REQ-001",
-    "artifact_id": "src/auth/service.py#AuthenticationResult",
-    "artifact_type": "source_code"
-  },
-  {
-    "requirement_id": "REQ-001",
     "artifact_id": "tests/test_authentication.py#test_successful_login",
     "artifact_type": "test_case"
   },
@@ -96,11 +91,6 @@
   },
   {
     "requirement_id": "REQ-006",
-    "artifact_id": "src/users/service.py#UserProfile",
-    "artifact_type": "source_code"
-  },
-  {
-    "requirement_id": "REQ-006",
     "artifact_id": "tests/test_users.py#test_get_existing_user_profile",
     "artifact_type": "test_case"
   },
@@ -138,7 +128,7 @@
   },
   {
     "requirement_id": "REQ-008",
-    "artifact_id": "tests/test_authentication.py#test_successful_login",
+    "artifact_id": "tests/test_authentication.py#test_password_is_hashed_not_stored_plaintext",
     "artifact_type": "test_case"
   },
 
@@ -158,11 +148,6 @@
     "artifact_type": "test_case"
   },
 
-  {
-    "requirement_id": "REQ-010",
-    "artifact_id": "src/security/rate_limiter.py#RateLimiter",
-    "artifact_type": "source_code"
-  },
   {
     "requirement_id": "REQ-010",
     "artifact_id": "src/security/rate_limiter.py#RateLimiter.record_failure",
