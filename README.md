@@ -4,7 +4,12 @@ An intelligent platform for automated requirements traceability and change impac
 
 ## Status
 
-Early development (Milestone 0: Project Foundation).
+Active development:
+- **Milestone 0 (Project Foundation):** Complete
+- **Milestone 1A (Artifact Ingestion):** Complete
+- **Milestone 1B (Python Artifact Chunk Extraction):** Complete
+- **Synthetic Evaluation Fixtures (PR #1):** Complete
+- **Milestone 1C (Text Preprocessing):** Next in progress
 
 ## Project Scope
 
@@ -18,16 +23,17 @@ The system will also investigate change impact analysis using recovered trace li
 
 ## Architecture & Project Structure
 
-The repository is organized into the following architectural components:
+The repository follows a standard `src` layout under `src/tracewise/`:
 
-- `src/tracewise/`: Core Python package containing domain models and shared utilities
+- `src/tracewise/`: Core Python package
   - `models/`: Domain models (`Artifact`, `ArtifactChunk`, `ArtifactType`, `TraceLink`, `TraceLinkStatus`)
-- `engine/`: Trace link recovery engine (preprocessing, retrieval, ranking, semantic, structural)
-- `backend/`: Application backend services
-- `frontend/`: User interface
-- `cia/`: Change impact analysis
-- `data/`: Dataset management and benchmarks
-- `experiments/`: Evaluation experiments and metrics
+  - `ingestion/`: Filesystem traversal, path normalization, rule matching, and structural chunkers (`ArtifactIngestor`, `PythonChunker`)
+  - `preprocessing/`: Text normalization, code tokenization, and vocabulary extraction (Milestone 1C)
+  - `retrieval/`: Candidate retrieval strategies (TF-IDF, BM25, semantic embeddings)
+  - `ranking/`: Candidate ranking and score combination
+  - `cia/`: Change impact analysis engine
+- `data/`: Dataset fixtures, benchmarks, and ground-truth traceability links (`data/fixtures/sample_project/`)
+- `experiments/`: Benchmark evaluation harnesses and metric calculators
 - `tests/`: Automated unit and integration test suite
 - `docs/`: Technical specifications and architectural documentation
 

@@ -39,7 +39,7 @@ system** with the following capabilities:
 ```
 data/fixtures/sample_project/
 ├── README.md                  # This file
-├── trace_links.json           # Ground-truth traceability links (36 links)
+├── trace_links.json           # Ground-truth traceability links (33 links)
 ├── change_scenarios.json      # Hypothetical change-impact scenarios (3 scenarios)
 ├── requirements/              # 10 requirement specification files
 │   ├── REQ-001.md             # User authentication via email/password
@@ -65,7 +65,7 @@ data/fixtures/sample_project/
 │       ├── __init__.py
 │       └── rate_limiter.py    # RateLimiter
 └── tests/                     # 4 Python test files
-    ├── test_authentication.py # 5 tests for login/auth flows
+    ├── test_authentication.py # 6 tests for login/auth flows
     ├── test_tokens.py         # 6 tests for token logic
     ├── test_users.py          # 6 tests for user profiles
     └── test_rate_limiter.py   # 7 tests for rate limiting
@@ -78,12 +78,12 @@ data/fixtures/sample_project/
 | Requirements     | 10    |
 | Source files     | 5 (+ 3 `__init__.py`) |
 | Test files       | 4     |
-| Ground-truth trace links | 36 |
+| Ground-truth trace links | 33 |
 | Change scenarios | 3     |
 
 ## Ground-Truth Trace Links
 
-The file `trace_links.json` contains **36 manually curated traceability links**
+The file `trace_links.json` contains **33 manually curated traceability links**
 mapping each requirement to its implementing source-code artifacts and
 corresponding test cases.
 
