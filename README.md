@@ -11,6 +11,7 @@ Active development:
 - **Synthetic Evaluation Fixtures (PR #1):** Complete
 - **Milestone 1C (Text Preprocessing):** Complete
 - **Milestone 2A (Retrieval Contracts & Candidate Model):** Complete
+- **Milestone 2B (TF-IDF + Cosine Retrieval Baseline):** Complete
 
 ## Project Scope
 
@@ -30,7 +31,7 @@ The repository follows a standard `src` layout under `src/tracewise/`:
   - `models/`: Domain models (`Artifact`, `ArtifactChunk`, `ArtifactType`, `TraceLink`, `TraceLinkStatus`)
   - `ingestion/`: Filesystem traversal, path normalization, rule matching, and structural chunkers (`ArtifactIngestor`, `PythonChunker`)
   - `preprocessing/`: Text normalization, code tokenization, and `ProcessedText` representation (`src/tracewise/preprocessing/`, Milestone 1C - Complete)
-  - `retrieval/`: Candidate retrieval contracts (`BaseRetriever`, `RetrievalCandidate`) and future retrieval strategies (TF-IDF, BM25, semantic embeddings)
+  - `retrieval/`: Candidate retrieval contracts (`BaseRetriever`, `RetrievalCandidate`) and retrieval strategies (`TfidfRetriever`, Milestone 2B - Complete; BM25, semantic embeddings - future work)
   - `ranking/`: Candidate ranking and score combination
   - `cia/`: Change impact analysis engine
 - `data/`: Dataset fixtures, benchmarks, and ground-truth traceability links (`data/fixtures/sample_project/`)
@@ -70,3 +71,12 @@ ruff check .
 # Check code formatting
 ruff format --check .
 ```
+
+## Retrieval Baselines
+
+TraceWise uses candidate retrieval to generate ranked hypotheses across software artifacts:
+- **`TfidfRetriever` (Milestone 2B):** Serves as the first lexical retrieval baseline using sublinear term frequency ($1 + \ln(\text{count})$), smoothed inverse document frequency ($\ln(1 + N/\text{DF})$), and cosine similarity over pre-normalized document vectors.
+- **Established IR Technique:** TF-IDF with cosine similarity is an established information-retrieval baseline; TraceWise incorporates it as a standard comparative reference, not as a novel algorithm.
+- **Hypotheses vs. Ground Truth:** Candidate retrieval produces ranked candidate matches (`RetrievalCandidate`). Candidate generation is strictly distinct from ground-truth `TraceLink` creation, validation, and lifecycle management.
+- **Separation of Evaluation:** Evaluation against benchmark ground truth remains a separate layer.
+- **Future Work:** BM25 lexical retrieval, dense semantic retrieval, hybrid retrieval, structural dependency evidence, and LLM/RAG re-ranking remain future milestones.

@@ -25,6 +25,13 @@ from tracewise.preprocessing import (
     Preprocessor,
     ProcessedText,
 )
+from tracewise.retrieval import (
+    BaseRetriever,
+    NotIndexedError,
+    RetrievalCandidate,
+    RetrieverError,
+    TfidfRetriever,
+)
 
 __version__ = "0.1.0"
 
@@ -35,15 +42,20 @@ __all__ = [
     "ArtifactIngestor",
     "ArtifactType",
     "BaseChunker",
+    "BaseRetriever",
     "ChunkingError",
     "IngestionEncodingError",
     "IngestionError",
     "IngestionFileError",
     "IngestionRule",
+    "NotIndexedError",
     "Preprocessor",
     "ProcessedText",
     "PythonChunker",
     "PythonParsingError",
+    "RetrievalCandidate",
+    "RetrieverError",
+    "TfidfRetriever",
     "TraceLink",
     "TraceLinkStatus",
     "UnsupportedArtifactTypeError",

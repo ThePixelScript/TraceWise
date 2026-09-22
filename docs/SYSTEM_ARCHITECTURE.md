@@ -145,5 +145,40 @@ The retrieval layer does not know about filesystem traversal, ingestion, raw AST
 - **Results**: No duplicate `target_id` values per query. `top_k=None` returns the complete ranking; `top_k>0` limits results; `top_k<=0` raises `ValueError`.
 - **Lifecycle**: Retrievers must be indexed before querying (`retrieve` before `index` raises `NotIndexedError`). Re-indexing replaces the previous index completely.
 
-### 5. Future Concrete Implementations
-Concrete retrieval algorithms (such as TF-IDF, BM25, and dense semantic embeddings) will implement `BaseRetriever` in upcoming milestones.
+### 5. Concrete Implementations
+- **`TfidfRetriever` (Milestone 2B - Complete)**: Canonical lexical retrieval baseline using sublinear TF-IDF and Cosine similarity.
+- **Future Retrievers**: BM25 lexical retrieval, dense semantic retrieval, hybrid retrieval, structural dependency evidence, and LLM/RAG re-ranking remain future milestones.
+
+---
+
+## Lexical Retrieval Baseline: TF-IDF + Cosine (Milestone 2B)
+
+### 1. Scope & Role
+`TfidfRetriever` is located in `src/tracewise/retrieval/tfidf.py` and implements `BaseRetriever`. It serves as the initial lexical baseline for software artifact retrieval in TraceWise.
+
+TF-IDF with cosine similarity is a standard, classical technique from information retrieval; TraceWise uses it as a transparent, reproducible comparative baseline and makes no claim of algorithmic novelty.
+
+### 2. Algorithmic Specification
+- **Token Source**: Operates exclusively on `ProcessedText.tokens` emitted by the preprocessing layer. It does not re-tokenize, strip stopwords, access AST structures, or inspect raw files.
+- **Vocabulary Fitting**: Fitted strictly on indexed target documents (`sorted(unique target tokens)`). Unseen query terms do not expand the vocabulary and contribute zero weight.
+- **Sublinear Term Frequency**:
+  $$\text{TF}(t, d) = \begin{cases} 0 & \text{if } \text{count}(t, d) = 0 \\ 1 + \ln(\text{count}(t, d)) & \text{otherwise} \end{cases}$$
+- **Document Frequency**: $\text{DF}(t)$ is the count of indexed target documents containing $t$ at least once.
+- **Smoothed Inverse Document Frequency**:
+  $$\text{IDF}(t) = \ln\left(1 + \frac{N}{\text{DF}(t)}\right)$$
+  where $N$ is the total count of indexed target documents.
+- **Term Weighting**: $\text{weight}(t, d) = \text{TF}(t, d) \times \text{IDF}(t)$. The query vector uses the same fitted IDF values.
+- **Pre-normalized Dense Matrix**: Document rows are pre-normalized by their L2 norm during indexing into a dense `float64` NumPy matrix $D_{\text{norm}}$, enabling vectorized matrix-vector dot product retrieval:
+  $$\text{score}(q, d) = \frac{\mathbf{q} \cdot \mathbf{d}}{\|\mathbf{q}\|_2 \|\mathbf{d}\|_2} = \mathbf{d}_{\text{norm}} \cdot \mathbf{q}_{\text{norm}}$$
+  If $\|\mathbf{q}\|_2 \le 10^{-12}$ or $\|\mathbf{d}\|_2 \le 10^{-12}$, the similarity score is $0.0$. Scores are finite and clamped to $[0.0, 1.0]$.
+
+### 3. Lifecycle & Atomicity
+- **State Initialization**: Unindexed instances report `is_indexed = False` and raise `NotIndexedError` upon query.
+- **Atomic Indexing**: Index computation occurs in local temporary variables before state assignment. Any failure (e.g., empty corpus, duplicate `source_id`) raises `ValueError` and leaves the prior active index completely intact.
+- **Full Replacement**: Successfully calling `index` completely replaces the previous vocabulary, IDF weights, and document matrices.
+- **Query Immutability**: Query execution is purely read-only and never alters indexed state.
+
+### 4. Architectural Boundaries
+- **Hypothesis Generation vs Ground Truth**: Candidate retrieval produces ranked hypotheses (`RetrievalCandidate`). It does not create or mutate ground-truth `TraceLink` entities.
+- **Separation of Evaluation**: The retriever has no access to ground-truth link sets or evaluation metrics. Evaluation is conducted by an independent downstream evaluation harness using identical inputs.
+- **Fair Comparison Baseline**: The lexical vocabulary, token stream, and target chunk set are frozen to ensure direct, controlled comparison against upcoming BM25 and semantic embedding baselines.
