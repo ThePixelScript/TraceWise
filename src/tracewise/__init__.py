@@ -21,6 +21,10 @@ from tracewise.models import (
     TraceLink,
     TraceLinkStatus,
 )
+from tracewise.preprocessing import (
+    Preprocessor,
+    ProcessedText,
+)
 
 __version__ = "0.1.0"
 
@@ -36,6 +40,8 @@ __all__ = [
     "IngestionError",
     "IngestionFileError",
     "IngestionRule",
+    "Preprocessor",
+    "ProcessedText",
     "PythonChunker",
     "PythonParsingError",
     "TraceLink",

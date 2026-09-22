@@ -12,7 +12,7 @@ Artifacts
     ↓ (Structural Chunking)
 ArtifactChunks
     ↓ (Text Preprocessing)
-Preprocessed Tokens / Normalized Text
+Preprocessed Text (ProcessedText)
     ↓ (Retrieval & Ranking)
 TraceLinks
 ```
@@ -70,3 +70,32 @@ This overlap allows retrieval strategies to evaluate coarse-grained conceptual u
 ### 7. Syntax Error Handling & Empty Files
 - **Empty / whitespace files**: Files containing only whitespace or comments (valid syntax without top-level functions/classes) return an empty list `[]`.
 - **Parser failures**: Syntactically invalid Python files raise `PythonParsingError` (subclass of `ChunkingError`) detailing the file path and line number, ensuring callers distinguish valid empty artifacts from parsing failures.
+
+---
+
+## Text Preprocessing (Milestone 1C)
+
+### 1. Scope & Package Location
+The text preprocessing module resides in `src/tracewise/preprocessing/`:
+- `models.py`: Domain model `ProcessedText`
+- `normalizer.py`: Deterministic text normalization (`normalize_unicode`, `normalize_case`, `normalize_whitespace`, `normalize_text`)
+- `tokenizer.py`: Compound identifier splitting (`split_identifier`) and lexical tokenization (`tokenize`)
+- `preprocessor.py`: Stateless `Preprocessor` orchestrating transformation of `Artifact` and `ArtifactChunk` instances
+
+### 2. ProcessedText Contract & Role
+`ProcessedText` is the canonical domain model emitted by preprocessing and consumed by downstream retrieval indexing:
+- **`source_id`**: String identifier identifying the source `Artifact.id` or `ArtifactChunk.id`. Must be non-empty.
+- **`original_text`**: Exact, verbatim input text. Preserved without modification for provenance and downstream display.
+- **`normalized_text`**: Canonical, readable text sequence produced via Unicode NFC normalization, lowercasing, and whitespace collapsing. Punctuation and sentence/code structure are preserved for semantic retrieval models.
+- **`tokens`**: Deterministic list of lowercased lexical terms with compound identifiers split and punctuation removed. Required field serving as the term representation for lexical retrieval.
+- **`metadata`**: Free-form dictionary preserving upstream artifact/chunk metadata and structural provenance (`artifact_type`, `parent_id`, `name`, `start_line`, `end_line`).
+- **`model_config = ConfigDict(extra="forbid")`**: Strict schema forbidding undocumented fields.
+
+### 3. Determinism & Input Preservation
+All preprocessing components are pure, stateless, and deterministic:
+- Identical input text yields identical `normalized_text` and `tokens` across runs and instances.
+- Input `Artifact` and `ArtifactChunk` objects are never mutated.
+- Stopword removal, stemming, lemmatization, and aggressive keyword filtering are disabled by default to maintain research neutrality and prevent benchmark overfitting.
+
+### 4. Preprocessing → Retrieval Boundary
+The retrieval layer consumes `ProcessedText` objects as its unit of indexing and query evaluation. Retrieval strategies do not access filesystem storage, AST parsing, or raw artifact ingestion details; they operate solely on the preprocessed representations (`normalized_text` for dense/semantic models, `tokens` for sparse/lexical models).
