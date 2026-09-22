@@ -255,6 +255,9 @@ class TestTokenize:
         assert "return" in tokens
         assert "401" in tokens
 
+    def test_unicode_tokens(self):
+        assert tokenize("Straße café naïve") == ["straße", "café", "naïve"]
+
 
 # -----------------------------------------------------------------------
 # ProcessedText model
@@ -322,19 +325,38 @@ class TestProcessedText:
                 tfidf_vector=[0.1, 0.2],  # type: ignore[call-arg]
             )
 
-    def test_default_empty_tokens(self):
+    def test_tokens_explicitly_supplied(self):
+        pt = ProcessedText(
+            source_id="REQ-001",
+            original_text="hello",
+            normalized_text="hello",
+            tokens=["hello"],
+        )
+        assert pt.tokens == ["hello"]
+
+    def test_tokens_empty_list_valid(self):
         pt = ProcessedText(
             source_id="REQ-001",
             original_text="",
             normalized_text="",
+            tokens=[],
         )
         assert pt.tokens == []
+
+    def test_missing_tokens_rejected(self):
+        with pytest.raises(ValidationError, match="tokens"):
+            ProcessedText(  # type: ignore[call-arg]
+                source_id="REQ-001",
+                original_text="",
+                normalized_text="",
+            )
 
     def test_default_empty_metadata(self):
         pt = ProcessedText(
             source_id="REQ-001",
             original_text="text",
             normalized_text="text",
+            tokens=["text"],
         )
         assert pt.metadata == {}
 
@@ -451,6 +473,45 @@ class TestPreprocessor:
         assert result.source_id == "src/auth/service.py#AuthService.login"
         assert "login" in result.tokens
         assert result.metadata["chunk_type"] == "function"
+        assert result.metadata["parent_id"] == "test-artifact"
+        assert result.metadata["name"] == "hello"
+        assert result.metadata["start_line"] == 1
+        assert result.metadata["end_line"] == 1
+
+    def test_process_artifact_preserves_metadata(self):
+        p = Preprocessor()
+        artifact = Artifact(
+            id="REQ-002",
+            artifact_type=ArtifactType.REQUIREMENT,
+            file_path="docs/reqs.md",
+            raw_content="The system shall encrypt data at rest.",
+            content="The system shall encrypt data at rest.",
+            metadata={"priority": "high", "author": "security-team"},
+        )
+        result = p.process_artifact(artifact)
+        assert result.metadata["artifact_type"] == "REQUIREMENT"
+        assert result.metadata["priority"] == "high"
+        assert result.metadata["author"] == "security-team"
+
+    def test_process_chunk_preserves_metadata_and_provenance(self):
+        p = Preprocessor()
+        chunk = ArtifactChunk(
+            id="src/auth/service.py#AuthService.login",
+            parent_id="src/auth/service.py#AuthService",
+            name="login",
+            raw_content="async def login(self, email, password): pass",
+            content="async def login(self, email, password): pass",
+            start_line=10,
+            end_line=15,
+            metadata={"chunk_type": "method", "is_async": True},
+        )
+        result = p.process_chunk(chunk)
+        assert result.metadata["chunk_type"] == "method"
+        assert result.metadata["is_async"] is True
+        assert result.metadata["parent_id"] == "src/auth/service.py#AuthService"
+        assert result.metadata["name"] == "login"
+        assert result.metadata["start_line"] == 10
+        assert result.metadata["end_line"] == 15
 
     def test_no_mutation_of_artifact(self):
         p = Preprocessor()
@@ -591,8 +652,20 @@ class TestCodePreprocessing:
 class TestEdgeCases:
     def test_unicode_characters(self):
         p = Preprocessor()
-        result = p.process_text("test", "Stra\u00dfe caf\u00e9")
-        assert result.normalized_text == "stra\u00dfe caf\u00e9"
+        result = p.process_text("test", "Straße café naïve")
+        assert result.normalized_text == "straße café naïve"
+        assert result.tokens == ["straße", "café", "naïve"]
+
+    def test_unicode_individual_words(self):
+        p = Preprocessor()
+        for word, expected in [
+            ("Straße", "straße"),
+            ("café", "café"),
+            ("naïve", "naïve"),
+        ]:
+            res = p.process_text("test-id", word)
+            assert res.normalized_text == expected
+            assert res.tokens == [expected]
 
     def test_numbers_only(self):
         p = Preprocessor()

@@ -71,10 +71,10 @@ def split_identifier(identifier: str) -> list[str]:
 # Lexical tokenization
 # ---------------------------------------------------------------------------
 
-# Matches contiguous runs of alphanumeric characters (including underscores
-# and hyphens that sit between alnums, so compound identifiers stay together
-# for subsequent splitting).
-_WORD_RE = re.compile(r"[A-Za-z0-9]+(?:[_\-][A-Za-z0-9]+)*")
+# Matches contiguous runs of Unicode alphanumeric characters (including
+# underscores and hyphens that sit between word characters, so compound
+# identifiers stay together for subsequent splitting).
+_WORD_RE = re.compile(r"[^\W_]+(?:[_\-][^\W_]+)*")
 
 
 def tokenize(text: str) -> list[str]:

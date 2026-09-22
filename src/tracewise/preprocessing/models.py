@@ -18,7 +18,7 @@ class ProcessedText(BaseModel):
     source_id: str
     original_text: str
     normalized_text: str
-    tokens: list[str] = Field(default_factory=list)
+    tokens: list[str]
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("source_id")

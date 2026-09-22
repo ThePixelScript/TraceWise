@@ -60,10 +60,14 @@ class Preprocessor:
         ``artifact.content`` as the input text.  The artifact is never
         mutated.
         """
+        metadata = {
+            **artifact.metadata,
+            "artifact_type": artifact.artifact_type.value,
+        }
         return self.process_text(
             source_id=artifact.id,
             text=artifact.content,
-            metadata={"artifact_type": artifact.artifact_type.value},
+            metadata=metadata,
         )
 
     def process_chunk(self, chunk: ArtifactChunk) -> ProcessedText:
@@ -72,10 +76,17 @@ class Preprocessor:
         Uses ``chunk.id`` as the ``source_id`` and ``chunk.content``
         as the input text.  The chunk is never mutated.
         """
+        metadata = {
+            **chunk.metadata,
+            "parent_id": chunk.parent_id,
+            "name": chunk.name,
+            "start_line": chunk.start_line,
+            "end_line": chunk.end_line,
+        }
         return self.process_text(
             source_id=chunk.id,
             text=chunk.content,
-            metadata={"chunk_type": chunk.metadata.get("chunk_type", "")},
+            metadata=metadata,
         )
 
 
