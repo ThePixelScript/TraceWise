@@ -99,3 +99,51 @@ All preprocessing components are pure, stateless, and deterministic:
 
 ### 4. Preprocessing → Retrieval Boundary
 The retrieval layer consumes `ProcessedText` objects as its unit of indexing and query evaluation. Retrieval strategies do not access filesystem storage, AST parsing, or raw artifact ingestion details; they operate solely on the preprocessed representations (`normalized_text` for dense/semantic models, `tokens` for sparse/lexical models).
+
+---
+
+## Retrieval Layer Contracts (Milestone 2A)
+
+### 1. Scope & Package Location
+The retrieval contracts reside in `src/tracewise/retrieval/`:
+- `models.py`: `RetrievalCandidate`
+- `base.py`: `BaseRetriever` abstract base class (imports `ProcessedText` from `tracewise.preprocessing.models`)
+- `exceptions.py`: `RetrieverError`, `NotIndexedError`
+
+### 2. Architectural Flow
+The retrieval layer sits between text preprocessing and candidate ranking / link creation:
+```
+Artifact / ArtifactChunk
+    ↓ (Preprocessing)
+ProcessedText (query / corpus)
+    ↓
+BaseRetriever.index(documents) / retrieve(query, top_k)
+    ↓
+RetrievalCandidate[] (query_id, target_id, score, rank, retriever_name)
+    ↓
+Ranking & Candidate Combination
+    ↓
+Evaluation / Human Verification
+    ↓
+TraceLink (source_id, target_id, status)
+```
+
+The retrieval layer does not know about filesystem traversal, ingestion, raw AST parsing, or evaluation metrics. It consumes `ProcessedText` and yields ranked `RetrievalCandidate` lists.
+
+### 3. RetrievalCandidate vs TraceLink
+- **`RetrievalCandidate`**: Represents an algorithm-generated candidate match. It is immutable/frozen, stores raw unnormalized scores, 1-based consecutive ranks, and the originating `retriever_name`. It has no acceptance/rejection status or verification lifecycle.
+- **`TraceLink`**: Represents a validated or proposed traceability relationship with a lifecycle `TraceLinkStatus` (e.g., `PROPOSED`, `VERIFIED`, `REJECTED`).
+- Conceptually:
+  - `RetrievalCandidate.query_id` → `TraceLink.source_id`
+  - `RetrievalCandidate.target_id` → `TraceLink.target_id`
+
+### 4. Shared Contract Semantics
+- **Score**: Higher score denotes higher relevance. Raw matcher scores are preserved without normalization.
+- **Rank**: 1-based, consecutive integers (1, 2, 3, ...).
+- **Ordering**: Sorted by descending score, breaking ties deterministically by `target_id` ascending:
+  `sorted(candidates, key=lambda c: (-c.score, c.target_id))`
+- **Results**: No duplicate `target_id` values per query. `top_k=None` returns the complete ranking; `top_k>0` limits results; `top_k<=0` raises `ValueError`.
+- **Lifecycle**: Retrievers must be indexed before querying (`retrieve` before `index` raises `NotIndexedError`). Re-indexing replaces the previous index completely.
+
+### 5. Future Concrete Implementations
+Concrete retrieval algorithms (such as TF-IDF, BM25, and dense semantic embeddings) will implement `BaseRetriever` in upcoming milestones.
