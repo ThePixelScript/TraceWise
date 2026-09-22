@@ -9,8 +9,8 @@ Active development:
 - **Milestone 1A (Artifact Ingestion):** Complete
 - **Milestone 1B (Python Artifact Chunk Extraction):** Complete
 - **Synthetic Evaluation Fixtures (PR #1):** Complete
-- **Milestone 1D-1 (Retrieval Contracts):** Complete
-- **Milestone 1C (Text Preprocessing):** In progress (parallel track)
+- **Milestone 1C (Text Preprocessing):** Complete
+- **Milestone 2A (Retrieval Contracts & Candidate Model):** Complete
 
 ## Project Scope
 
@@ -29,8 +29,8 @@ The repository follows a standard `src` layout under `src/tracewise/`:
 - `src/tracewise/`: Core Python package
   - `models/`: Domain models (`Artifact`, `ArtifactChunk`, `ArtifactType`, `TraceLink`, `TraceLinkStatus`)
   - `ingestion/`: Filesystem traversal, path normalization, rule matching, and structural chunkers (`ArtifactIngestor`, `PythonChunker`)
-  - `preprocessing/`: Text normalization, code tokenization, and vocabulary extraction (Milestone 1C)
-  - `retrieval/`: Candidate retrieval contracts (`BaseRetriever`, `RetrievalCandidate`); future TF-IDF, BM25, and semantic implementations
+  - `preprocessing/`: Text normalization, code tokenization, and `ProcessedText` representation (`src/tracewise/preprocessing/`, Milestone 1C - Complete)
+  - `retrieval/`: Candidate retrieval contracts (`BaseRetriever`, `RetrievalCandidate`) and future retrieval strategies (TF-IDF, BM25, semantic embeddings)
   - `ranking/`: Candidate ranking and score combination
   - `cia/`: Change impact analysis engine
 - `data/`: Dataset fixtures, benchmarks, and ground-truth traceability links (`data/fixtures/sample_project/`)

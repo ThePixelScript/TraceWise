@@ -12,7 +12,7 @@ Artifacts
     ↓ (Structural Chunking)
 ArtifactChunks
     ↓ (Text Preprocessing)
-Preprocessed Tokens / Normalized Text
+Preprocessed Text (ProcessedText)
     ↓ (Retrieval & Ranking)
 TraceLinks
 ```
@@ -73,7 +73,36 @@ This overlap allows retrieval strategies to evaluate coarse-grained conceptual u
 
 ---
 
-## Retrieval Layer Contracts
+## Text Preprocessing (Milestone 1C)
+
+### 1. Scope & Package Location
+The text preprocessing module resides in `src/tracewise/preprocessing/`:
+- `models.py`: Domain model `ProcessedText`
+- `normalizer.py`: Deterministic text normalization (`normalize_unicode`, `normalize_case`, `normalize_whitespace`, `normalize_text`)
+- `tokenizer.py`: Compound identifier splitting (`split_identifier`) and lexical tokenization (`tokenize`)
+- `preprocessor.py`: Stateless `Preprocessor` orchestrating transformation of `Artifact` and `ArtifactChunk` instances
+
+### 2. ProcessedText Contract & Role
+`ProcessedText` is the canonical domain model emitted by preprocessing and consumed by downstream retrieval indexing:
+- **`source_id`**: String identifier identifying the source `Artifact.id` or `ArtifactChunk.id`. Must be non-empty.
+- **`original_text`**: Exact, verbatim input text. Preserved without modification for provenance and downstream display.
+- **`normalized_text`**: Canonical, readable text sequence produced via Unicode NFC normalization, lowercasing, and whitespace collapsing. Punctuation and sentence/code structure are preserved for semantic retrieval models.
+- **`tokens`**: Deterministic list of lowercased lexical terms with compound identifiers split and punctuation removed. Required field serving as the term representation for lexical retrieval.
+- **`metadata`**: Free-form dictionary preserving upstream artifact/chunk metadata and structural provenance (`artifact_type`, `parent_id`, `name`, `start_line`, `end_line`).
+- **`model_config = ConfigDict(extra="forbid")`**: Strict schema forbidding undocumented fields.
+
+### 3. Determinism & Input Preservation
+All preprocessing components are pure, stateless, and deterministic:
+- Identical input text yields identical `normalized_text` and `tokens` across runs and instances.
+- Input `Artifact` and `ArtifactChunk` objects are never mutated.
+- Stopword removal, stemming, lemmatization, and aggressive keyword filtering are disabled by default to maintain research neutrality and prevent benchmark overfitting.
+
+### 4. Preprocessing → Retrieval Boundary
+The retrieval layer consumes `ProcessedText` objects as its unit of indexing and query evaluation. Retrieval strategies do not access filesystem storage, AST parsing, or raw artifact ingestion details; they operate solely on the preprocessed representations (`normalized_text` for dense/semantic models, `tokens` for sparse/lexical models).
+
+---
+
+## Retrieval Layer Contracts (Milestone 2A)
 
 ### 1. Scope & Package Location
 The retrieval contracts reside in `src/tracewise/retrieval/`:
@@ -82,13 +111,17 @@ The retrieval contracts reside in `src/tracewise/retrieval/`:
 - `exceptions.py`: `RetrieverError`, `NotIndexedError`
 
 ### 2. Architectural Flow
-The retrieval layer sits between text preprocessing and evaluation / link creation:
+The retrieval layer sits between text preprocessing and candidate ranking / link creation:
 ```
+Artifact / ArtifactChunk
+    ↓ (Preprocessing)
 ProcessedText (query / corpus)
     ↓
 BaseRetriever.index(documents) / retrieve(query, top_k)
     ↓
 RetrievalCandidate[] (query_id, target_id, score, rank, retriever_name)
+    ↓
+Ranking & Candidate Combination
     ↓
 Evaluation / Human Verification
     ↓
