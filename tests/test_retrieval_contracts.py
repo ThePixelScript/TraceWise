@@ -5,13 +5,7 @@ from collections.abc import Sequence
 import pytest
 from pydantic import ValidationError
 
-pytest.importorskip(
-    "tracewise.preprocessing",
-    reason="Retrieval contracts require unmerged Milestone 1C preprocessing branch",
-)
-
 from tracewise.preprocessing.models import ProcessedText
-
 from tracewise.retrieval.base import BaseRetriever
 from tracewise.retrieval.exceptions import NotIndexedError, RetrieverError
 from tracewise.retrieval.models import RetrievalCandidate
@@ -31,7 +25,7 @@ class MockRetriever(BaseRetriever):
         return self._indexed
 
     def index(self, documents: Sequence[ProcessedText]) -> None:
-        self._documents = {doc.id: doc for doc in documents}
+        self._documents = {doc.source_id: doc for doc in documents}
         self._indexed = True
 
     def retrieve(
@@ -60,7 +54,7 @@ class MockRetriever(BaseRetriever):
 
         return [
             RetrievalCandidate(
-                query_id=query.id,
+                query_id=query.source_id,
                 target_id=doc_id,
                 score=score,
                 rank=idx,
@@ -282,15 +276,30 @@ class TestRetrieverLifecycle:
 
     def test_retrieve_before_index_raises_not_indexed_error(self):
         retriever = MockRetriever()
-        query = ProcessedText(id="Q-1", content="search query")
+        query = ProcessedText(
+            source_id="Q-1",
+            original_text="search query",
+            normalized_text="search query",
+            tokens=["search", "query"],
+        )
         with pytest.raises(NotIndexedError, match="cannot retrieve before indexing"):
             retriever.retrieve(query)
 
     def test_index_changes_indexed_state(self):
         retriever = MockRetriever()
         docs = [
-            ProcessedText(id="D-1", content="doc one"),
-            ProcessedText(id="D-2", content="doc two"),
+            ProcessedText(
+                source_id="D-1",
+                original_text="doc one",
+                normalized_text="doc one",
+                tokens=["doc", "one"],
+            ),
+            ProcessedText(
+                source_id="D-2",
+                original_text="doc two",
+                normalized_text="doc two",
+                tokens=["doc", "two"],
+            ),
         ]
         retriever.index(docs)
         assert retriever.is_indexed is True
@@ -298,15 +307,30 @@ class TestRetrieverLifecycle:
     def test_reindexing_replaces_index_completely(self):
         retriever = MockRetriever()
         initial_docs = [
-            ProcessedText(id="D-1", content="doc one"),
-            ProcessedText(id="D-2", content="doc two"),
+            ProcessedText(
+                source_id="D-1",
+                original_text="doc one",
+                normalized_text="doc one",
+                tokens=["doc", "one"],
+            ),
+            ProcessedText(
+                source_id="D-2",
+                original_text="doc two",
+                normalized_text="doc two",
+                tokens=["doc", "two"],
+            ),
         ]
         retriever.index(initial_docs)
         assert len(retriever._documents) == 2
         assert "D-1" in retriever._documents
 
         new_docs = [
-            ProcessedText(id="D-3", content="doc three"),
+            ProcessedText(
+                source_id="D-3",
+                original_text="doc three",
+                normalized_text="doc three",
+                tokens=["doc", "three"],
+            ),
         ]
         retriever.index(new_docs)
         assert len(retriever._documents) == 1
@@ -316,32 +340,86 @@ class TestRetrieverLifecycle:
 
     def test_top_k_zero_raises_value_error(self):
         retriever = MockRetriever()
-        retriever.index([ProcessedText(id="D-1", content="doc one")])
-        query = ProcessedText(id="Q-1", content="query")
+        retriever.index(
+            [
+                ProcessedText(
+                    source_id="D-1",
+                    original_text="doc one",
+                    normalized_text="doc one",
+                    tokens=["doc", "one"],
+                )
+            ]
+        )
+        query = ProcessedText(
+            source_id="Q-1",
+            original_text="query",
+            normalized_text="query",
+            tokens=["query"],
+        )
         with pytest.raises(ValueError, match="strictly positive"):
             retriever.retrieve(query, top_k=0)
 
     def test_top_k_negative_raises_value_error(self):
         retriever = MockRetriever()
-        retriever.index([ProcessedText(id="D-1", content="doc one")])
-        query = ProcessedText(id="Q-1", content="query")
+        retriever.index(
+            [
+                ProcessedText(
+                    source_id="D-1",
+                    original_text="doc one",
+                    normalized_text="doc one",
+                    tokens=["doc", "one"],
+                )
+            ]
+        )
+        query = ProcessedText(
+            source_id="Q-1",
+            original_text="query",
+            normalized_text="query",
+            tokens=["query"],
+        )
         with pytest.raises(ValueError, match="strictly positive"):
             retriever.retrieve(query, top_k=-5)
 
     def test_top_k_none_returns_all_candidates(self):
         retriever = MockRetriever()
-        docs = [ProcessedText(id=f"D-{i}", content=f"doc {i}") for i in range(5)]
+        docs = [
+            ProcessedText(
+                source_id=f"D-{i}",
+                original_text=f"doc {i}",
+                normalized_text=f"doc {i}",
+                tokens=["doc", str(i)],
+            )
+            for i in range(5)
+        ]
         retriever.index(docs)
-        query = ProcessedText(id="Q-1", content="query")
+        query = ProcessedText(
+            source_id="Q-1",
+            original_text="query",
+            normalized_text="query",
+            tokens=["query"],
+        )
 
         candidates = retriever.retrieve(query, top_k=None)
         assert len(candidates) == 5
 
     def test_top_k_limits_returned_results(self):
         retriever = MockRetriever()
-        docs = [ProcessedText(id=f"D-{i}", content=f"doc {i}") for i in range(10)]
+        docs = [
+            ProcessedText(
+                source_id=f"D-{i}",
+                original_text=f"doc {i}",
+                normalized_text=f"doc {i}",
+                tokens=["doc", str(i)],
+            )
+            for i in range(10)
+        ]
         retriever.index(docs)
-        query = ProcessedText(id="Q-1", content="query")
+        query = ProcessedText(
+            source_id="Q-1",
+            original_text="query",
+            normalized_text="query",
+            tokens=["query"],
+        )
 
         candidates = retriever.retrieve(query, top_k=3)
         assert len(candidates) == 3
@@ -355,10 +433,23 @@ class TestRetrieverCandidateOrdering:
             "target_high": 0.9,
             "target_mid": 0.5,
         }
-        docs = [ProcessedText(id=k, content="text") for k in retriever.preset_scores]
+        docs = [
+            ProcessedText(
+                source_id=k,
+                original_text="text",
+                normalized_text="text",
+                tokens=["text"],
+            )
+            for k in retriever.preset_scores
+        ]
         retriever.index(docs)
 
-        query = ProcessedText(id="Q-1", content="query")
+        query = ProcessedText(
+            source_id="Q-1",
+            original_text="query",
+            normalized_text="query",
+            tokens=["query"],
+        )
         candidates = retriever.retrieve(query)
 
         assert [c.target_id for c in candidates] == [
@@ -375,10 +466,23 @@ class TestRetrieverCandidateOrdering:
             "src/a_module.py#func": 0.75,
             "src/m_module.py#func": 0.75,
         }
-        docs = [ProcessedText(id=k, content="text") for k in retriever.preset_scores]
+        docs = [
+            ProcessedText(
+                source_id=k,
+                original_text="text",
+                normalized_text="text",
+                tokens=["text"],
+            )
+            for k in retriever.preset_scores
+        ]
         retriever.index(docs)
 
-        query = ProcessedText(id="Q-1", content="query")
+        query = ProcessedText(
+            source_id="Q-1",
+            original_text="query",
+            normalized_text="query",
+            tokens=["query"],
+        )
         candidates = retriever.retrieve(query)
 
         assert [c.target_id for c in candidates] == [
@@ -395,10 +499,23 @@ class TestRetrieverCandidateOrdering:
             "T-3": 0.4,
             "T-4": 0.2,
         }
-        docs = [ProcessedText(id=k, content="text") for k in retriever.preset_scores]
+        docs = [
+            ProcessedText(
+                source_id=k,
+                original_text="text",
+                normalized_text="text",
+                tokens=["text"],
+            )
+            for k in retriever.preset_scores
+        ]
         retriever.index(docs)
 
-        query = ProcessedText(id="Q-1", content="query")
+        query = ProcessedText(
+            source_id="Q-1",
+            original_text="query",
+            normalized_text="query",
+            tokens=["query"],
+        )
         candidates = retriever.retrieve(query)
 
         ranks = [c.rank for c in candidates]
@@ -407,13 +524,33 @@ class TestRetrieverCandidateOrdering:
     def test_no_duplicate_target_ids_returned(self):
         retriever = MockRetriever()
         docs = [
-            ProcessedText(id="T-1", content="doc 1"),
-            ProcessedText(id="T-2", content="doc 2"),
-            ProcessedText(id="T-3", content="doc 3"),
+            ProcessedText(
+                source_id="T-1",
+                original_text="doc 1",
+                normalized_text="doc 1",
+                tokens=["doc", "1"],
+            ),
+            ProcessedText(
+                source_id="T-2",
+                original_text="doc 2",
+                normalized_text="doc 2",
+                tokens=["doc", "2"],
+            ),
+            ProcessedText(
+                source_id="T-3",
+                original_text="doc 3",
+                normalized_text="doc 3",
+                tokens=["doc", "3"],
+            ),
         ]
         retriever.index(docs)
 
-        query = ProcessedText(id="Q-1", content="query")
+        query = ProcessedText(
+            source_id="Q-1",
+            original_text="query",
+            normalized_text="query",
+            tokens=["query"],
+        )
         candidates = retriever.retrieve(query)
 
         target_ids = [c.target_id for c in candidates]
