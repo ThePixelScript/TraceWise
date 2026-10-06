@@ -55,10 +55,12 @@ from tracewise.preprocessing import (
 from tracewise.retrieval import (
     BaseRetriever,
     BM25Retriever,
+    HybridRetriever,
     NotIndexedError,
     RetrievalCandidate,
     RetrieverError,
     SemanticRetriever,
+    StructuralRetriever,
     TfidfRetriever,
 )
 
@@ -80,6 +82,7 @@ __all__ = [
     "BenchmarkValidationError",
     "ChunkingError",
     "EvaluationResult",
+    "HybridRetriever",
     "IngestionEncodingError",
     "IngestionError",
     "IngestionFileError",
@@ -99,6 +102,7 @@ __all__ = [
     "RetrievalCandidate",
     "RetrieverError",
     "SemanticRetriever",
+    "StructuralRetriever",
     "TfidfRetriever",
     "TraceLink",
     "TraceLinkStatus",

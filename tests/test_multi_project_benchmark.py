@@ -17,6 +17,7 @@ from tracewise.evaluation import (
 from tracewise.preprocessing.models import ProcessedText
 from tracewise.retrieval import (
     BM25Retriever,
+    HybridRetriever,
     SemanticRetriever,
     StructuralRetriever,
     TfidfRetriever,
@@ -467,3 +468,23 @@ class TestSampleProjectExactRegression:
         assert p_res.recall_at_k[1] == pytest.approx(0.1000, abs=1e-3)
         assert p_res.recall_at_k[3] == pytest.approx(0.4000, abs=1e-3)
         assert p_res.recall_at_k[5] == pytest.approx(0.7000, abs=1e-3)
+
+    def test_b4_hybrid_regression(self, sample_project: BenchmarkProject):
+        runner = MultiProjectBenchmarkRunner([sample_project])
+        result = runner.run(
+            HybridRetriever(k=60),
+            artifact_type_filter="source_code",
+        )
+        p_res = result.project_results["sample_project"]
+
+        # Exact frozen metrics for B4:
+        assert p_res.map == pytest.approx(0.7575, abs=1e-3)
+        assert p_res.mrr == pytest.approx(0.8750, abs=1e-3)
+
+        assert p_res.precision_at_k[1] == pytest.approx(0.8000, abs=1e-3)
+        assert p_res.precision_at_k[3] == pytest.approx(0.3667, abs=1e-3)
+        assert p_res.precision_at_k[5] == pytest.approx(0.2600, abs=1e-3)
+
+        assert p_res.recall_at_k[1] == pytest.approx(0.5500, abs=1e-3)
+        assert p_res.recall_at_k[3] == pytest.approx(0.7500, abs=1e-3)
+        assert p_res.recall_at_k[5] == pytest.approx(0.8500, abs=1e-3)

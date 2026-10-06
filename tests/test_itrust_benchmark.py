@@ -25,6 +25,7 @@ from tracewise.evaluation.validation import (
 from tracewise.ingestion.file_chunker import FileChunker
 from tracewise.models.artifact import Artifact, ArtifactType
 from tracewise.retrieval.bm25 import BM25Retriever
+from tracewise.retrieval.hybrid import HybridRetriever
 from tracewise.retrieval.semantic import SemanticRetriever
 from tracewise.retrieval.structural import StructuralRetriever
 from tracewise.retrieval.tfidf import TfidfRetriever
@@ -428,3 +429,20 @@ class TestITrustEvaluationDenominatorAndReporting:
         assert round(p_res.recall_at_k[1], 4) == 0.0247
         assert round(p_res.recall_at_k[3], 4) == 0.1569
         assert round(p_res.recall_at_k[5], 4) == 0.2316
+
+    def test_itrust_b4_hybrid_results(self):
+        manifest = BenchmarkProjectManifest.from_file(ITRUST_MANIFEST)
+        project = ProjectIngestionAdapter().ingest_project(manifest, validate=True)
+        runner = MultiProjectBenchmarkRunner([project], k_values=(1, 3, 5))
+
+        res = runner.run(HybridRetriever(k=60))
+        p_res = res.project_results["itrust"]
+
+        assert round(p_res.map, 4) == 0.2386
+        assert round(p_res.mrr, 4) == 0.3438
+        assert round(p_res.precision_at_k[1], 4) == 0.1619
+        assert round(p_res.precision_at_k[3], 4) == 0.1873
+        assert round(p_res.precision_at_k[5], 4) == 0.1619
+        assert round(p_res.recall_at_k[1], 4) == 0.0599
+        assert round(p_res.recall_at_k[3], 4) == 0.2133
+        assert round(p_res.recall_at_k[5], 4) == 0.3094

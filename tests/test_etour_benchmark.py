@@ -23,6 +23,7 @@ from tracewise.evaluation.validation import (
     validate_benchmark_project,
 )
 from tracewise.retrieval.bm25 import BM25Retriever
+from tracewise.retrieval.hybrid import HybridRetriever
 from tracewise.retrieval.semantic import SemanticRetriever
 from tracewise.retrieval.structural import StructuralRetriever
 from tracewise.retrieval.tfidf import TfidfRetriever
@@ -270,3 +271,20 @@ class TestETourEvaluationAndBaselineResults:
         assert "1" in table
         assert "116" in table
         assert "308" in table
+
+    def test_etour_b4_hybrid_results(self):
+        manifest = BenchmarkProjectManifest.from_file(ETOUR_MANIFEST)
+        project = ProjectIngestionAdapter().ingest_project(manifest, validate=True)
+        runner = MultiProjectBenchmarkRunner([project], k_values=(1, 3, 5))
+
+        res = runner.run(HybridRetriever(k=60))
+        p4 = res.project_results["etour"]
+
+        assert round(p4.map, 4) == 0.4415
+        assert round(p4.mrr, 4) == 0.6258
+        assert round(p4.precision_at_k[1], 4) == 0.4561
+        assert round(p4.precision_at_k[3], 4) == 0.4503
+        assert round(p4.precision_at_k[5], 4) == 0.3684
+        assert round(p4.recall_at_k[1], 4) == 0.0844
+        assert round(p4.recall_at_k[3], 4) == 0.2894
+        assert round(p4.recall_at_k[5], 4) == 0.3855

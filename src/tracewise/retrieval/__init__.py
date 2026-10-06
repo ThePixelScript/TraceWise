@@ -3,6 +3,11 @@
 from tracewise.retrieval.base import BaseRetriever
 from tracewise.retrieval.bm25 import BM25Retriever
 from tracewise.retrieval.exceptions import NotIndexedError, RetrieverError
+from tracewise.retrieval.hybrid import (
+    HybridRetriever,
+    compute_rrf_score,
+    fuse_rrf_rankings,
+)
 from tracewise.retrieval.models import RetrievalCandidate
 from tracewise.retrieval.semantic import SemanticRetriever
 from tracewise.retrieval.structural import StructuralRetriever
@@ -11,10 +16,13 @@ from tracewise.retrieval.tfidf import TfidfRetriever
 __all__ = [
     "BM25Retriever",
     "BaseRetriever",
+    "HybridRetriever",
     "NotIndexedError",
     "RetrievalCandidate",
     "RetrieverError",
     "SemanticRetriever",
     "StructuralRetriever",
     "TfidfRetriever",
+    "compute_rrf_score",
+    "fuse_rrf_rankings",
 ]
