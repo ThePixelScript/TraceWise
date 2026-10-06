@@ -10,6 +10,7 @@ from tracewise.ingestion.exceptions import (
     PythonParsingError,
     UnsupportedArtifactTypeError,
 )
+from tracewise.ingestion.file_chunker import FileChunker
 from tracewise.ingestion.ingestor import ArtifactIngestor
 from tracewise.ingestion.path_utils import normalize_posix_path
 from tracewise.ingestion.python_chunker import PythonChunker
@@ -20,6 +21,7 @@ __all__ = [
     "ArtifactIngestor",
     "BaseChunker",
     "ChunkingError",
+    "FileChunker",
     "IngestionEncodingError",
     "IngestionError",
     "IngestionFileError",

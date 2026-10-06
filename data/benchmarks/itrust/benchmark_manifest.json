@@ -1,0 +1,36 @@
+{
+  "project_id": "itrust",
+  "project_name": "iTrust (LiSSA ICSE 2025 req2code variant)",
+  "requirement_source": "UC/*.txt",
+  "source_path": "CC/*.java",
+  "ground_truth_path": "UC2JAVA.csv",
+  "ground_truth_format": "csv",
+  "requirement_artifact_type": "requirement",
+  "source_artifact_type": "source_code",
+  "chunking_config": {
+    "strategy": "file",
+    "granularity": "class",
+    "use_stem_as_id": true
+  },
+  "preprocessing_config": {
+    "normalize": true,
+    "tokenize_code": true
+  },
+  "metadata": {
+    "dataset_variant": "iTrust req2code benchmark variant sourced from the LiSSA ICSE 2025 replication package",
+    "source_repository": "https://github.com/ardoco/Replication-Package-ICSE25_LiSSA-Toward-Generic-Traceability-Link-Recovery-through-RAG",
+    "repository_commit": "a8e652f29bbdcc4bdcd3d98cd85aa4a37cb65480",
+    "dataset_subdirectory": "LiSSA-RATLR-V2/lissa/datasets/req2code/iTrust",
+    "sha256_uc2java_csv": "36e57100b6fa0066252b0b147bc79f5424e1fe739ca4c50d66f67fbbba9a6acd",
+    "citation": "Dominik Fuchss et al., LiSSA: Toward Generic Traceability Link Recovery through RAG, ICSE 2025 (DOI: 10.5281/zenodo.14714706)",
+    "licensing_status": "LiSSA tool framework is MIT-licensed (ArDoCo 2025); third-party NCSU/CoEST raw dataset redistribution terms cannot be established with certainty from upstream headers",
+    "total_requirements": 131,
+    "evaluable_requirements": 105,
+    "zero_link_requirements": 26,
+    "source_classes": 226,
+    "gold_links": 286,
+    "evaluation_denominator": "Ranking metrics (MAP, MRR, P@k, R@k) use the 105 evaluable requirements with >=1 gold link as denominator; zero-link queries are excluded from ranking metrics according to the TraceWise evaluation protocol.",
+    "dataset_scale": "An external real-world traceability benchmark of moderate size relative to the current synthetic fixture.",
+    "description": "iTrust req2code benchmark variant mapping 131 use-case subflows to 226 Java classes with 286 gold links (105 evaluable queries)."
+  }
+}

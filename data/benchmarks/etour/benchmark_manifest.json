@@ -1,0 +1,36 @@
+{
+  "project_id": "etour",
+  "project_name": "eTour (LiSSA ICSE 2025 req2code variant)",
+  "requirement_source": "UC/*.txt",
+  "source_path": "CC/*.java",
+  "ground_truth_path": "UC2CC.csv",
+  "ground_truth_format": "csv",
+  "requirement_artifact_type": "requirement",
+  "source_artifact_type": "source_code",
+  "chunking_config": {
+    "strategy": "file",
+    "granularity": "class",
+    "use_stem_as_id": true
+  },
+  "preprocessing_config": {
+    "normalize": true,
+    "tokenize_code": true
+  },
+  "metadata": {
+    "dataset_variant": "eTour req2code benchmark variant sourced from the LiSSA ICSE 2025 replication package",
+    "source_repository": "https://github.com/ardoco/Replication-Package-ICSE25_LiSSA-Toward-Generic-Traceability-Link-Recovery-through-RAG",
+    "repository_commit": "a8e652f29bbdcc4bdcd3d98cd85aa4a37cb65480",
+    "dataset_subdirectory": "LiSSA-RATLR-V2/lissa/datasets/req2code/eTour_en",
+    "sha256_uc2cc_csv": "bb9081ab8b1a0a42614ac25a19b0c044f9ec52323c074d6cd19eee0cd6154fde",
+    "citation": "Dominik Fuchss et al., LiSSA: Toward Generic Traceability Link Recovery through RAG, ICSE 2025 (DOI: 10.5281/zenodo.14714706)",
+    "licensing_status": "LiSSA tool framework is MIT-licensed (ArDoCo 2025); third-party University of Salerno/TEFSE 2011 raw dataset redistribution terms cannot be established with certainty from upstream headers",
+    "total_requirements": 58,
+    "evaluable_requirements": 57,
+    "zero_link_requirements": 1,
+    "source_classes": 116,
+    "gold_links": 308,
+    "evaluation_denominator": "Ranking metrics (MAP, MRR, P@k, R@k) use the 57 evaluable requirements with >=1 gold link as denominator; zero-link queries are excluded from ranking metrics according to the TraceWise evaluation protocol.",
+    "dataset_scale": "An external real-world traceability benchmark of moderate size relative to the current synthetic fixture.",
+    "description": "eTour req2code benchmark variant mapping 58 use cases to 116 Java classes with 308 gold links (57 evaluable queries, 1 zero-link query)."
+  }
+}

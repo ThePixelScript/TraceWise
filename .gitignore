@@ -39,3 +39,13 @@ experiments/results/
 !.env.example
 # Python build metadata
 *.egg-info/
+
+# External benchmark raw datasets (license-restricted / local placement)
+data/benchmarks/itrust/UC/
+data/benchmarks/itrust/CC/
+data/benchmarks/itrust/UC2JAVA.csv
+data/benchmarks/itrust/trace_links.json
+data/benchmarks/etour/UC/
+data/benchmarks/etour/CC/
+data/benchmarks/etour/UC2CC.csv
+data/benchmarks/etour/trace_links.json

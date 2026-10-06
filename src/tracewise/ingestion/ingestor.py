@@ -21,11 +21,12 @@ class ArtifactIngestor:
     DEFAULT_EXCLUDED_DIRS: frozenset[str] = frozenset(
         {".git", ".venv", "__pycache__", "node_modules"}
     )
-    SUPPORTED_EXTENSIONS: frozenset[str] = frozenset({".txt", ".md", ".py"})
+    SUPPORTED_EXTENSIONS: frozenset[str] = frozenset({".txt", ".md", ".py", ".java"})
     EXTENSION_TO_LANGUAGE: dict[str, str] = {
         ".py": "python",
         ".md": "markdown",
         ".txt": "text",
+        ".java": "java",
     }
 
     def __init__(

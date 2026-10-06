@@ -1,0 +1,22 @@
+{
+  "project_id": "sample_project",
+  "project_name": "Sample Project (Synthetic IDP Baseline)",
+  "requirement_source": "requirements/*.md",
+  "source_path": "src/**/*.py",
+  "ground_truth_path": "trace_links.json",
+  "ground_truth_format": "json",
+  "requirement_artifact_type": "requirement",
+  "source_artifact_type": "source_code",
+  "chunking_config": {
+    "granularity": "python_ast"
+  },
+  "preprocessing_config": {
+    "normalize": true,
+    "tokenize_code": true
+  },
+  "metadata": {
+    "synthetic": true,
+    "version": "1.0.0",
+    "description": "Controlled 10-requirement, 26-chunk synthetic baseline"
+  }
+}
