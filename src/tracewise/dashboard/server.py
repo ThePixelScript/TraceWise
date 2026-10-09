@@ -21,6 +21,7 @@ from tracewise.dashboard.service import TraceWiseService
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
+GENERIC_500_MESSAGE = "Internal server error."
 
 
 class DashboardRequestHandler(BaseHTTPRequestHandler):
@@ -41,9 +42,24 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         """Handle CORS preflight requests."""
         self.send_response(HTTPStatus.NO_CONTENT)
         self._send_cors_headers()
-        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Accept")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header(
+            "Access-Control-Allow-Headers", "Content-Type, Accept, Authorization"
+        )
         self.end_headers()
+
+    def do_POST(self) -> None:
+        """Handle POST requests for recording developer review decisions."""
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+
+        if not path.startswith("/api/"):
+            self._send_error(
+                HTTPStatus.METHOD_NOT_ALLOWED, "POST supported only on API routes."
+            )
+            return
+
+        self._handle_api_post(path)
 
     def do_GET(self) -> None:
         """Handle GET requests for REST API endpoints and static assets."""
@@ -67,10 +83,9 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         """Send JSON response with proper headers."""
         try:
             body = json.dumps(data, indent=2).encode("utf-8")
-        except Exception as exc:
-            self._send_error(
-                HTTPStatus.INTERNAL_SERVER_ERROR, f"Serialization error: {exc}"
-            )
+        except Exception:
+            logger.exception("Serialization error")
+            self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, GENERIC_500_MESSAGE)
             return
 
         self.send_response(status)
@@ -109,9 +124,9 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             try:
                 projects = service.get_projects()
                 self._send_json(HTTPStatus.OK, projects)
-            except Exception as exc:
+            except Exception:
                 logger.exception("Error fetching projects")
-                self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))
+                self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, GENERIC_500_MESSAGE)
             return
 
         # 4. Project-scoped endpoints: /api/projects/{project_id}/...
@@ -127,9 +142,11 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     self._send_json(HTTPStatus.OK, detail)
                 except KeyError as exc:
                     self._send_error(HTTPStatus.NOT_FOUND, str(exc))
-                except Exception as exc:
+                except Exception:
                     logger.exception("Error fetching project %s", project_id)
-                    self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))
+                    self._send_error(
+                        HTTPStatus.INTERNAL_SERVER_ERROR, GENERIC_500_MESSAGE
+                    )
                 return
 
             # GET /api/projects/{project_id}/requirements
@@ -142,9 +159,11 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     self._send_error(HTTPStatus.NOT_FOUND, str(exc))
                 except ValueError as exc:
                     self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
-                except Exception as exc:
+                except Exception:
                     logger.exception("Error fetching requirements for %s", project_id)
-                    self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))
+                    self._send_error(
+                        HTTPStatus.INTERNAL_SERVER_ERROR, GENERIC_500_MESSAGE
+                    )
                 return
 
             # Sub-routes: /api/projects/{project_id}/requirements/{req_id}/...
@@ -163,11 +182,13 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         self._send_error(HTTPStatus.NOT_FOUND, str(exc))
                     except ValueError as exc:
                         self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
-                    except Exception as exc:
+                    except Exception:
                         logger.exception(
                             "Error fetching req %s in %s", req_id, project_id
                         )
-                        self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))
+                        self._send_error(
+                            HTTPStatus.INTERNAL_SERVER_ERROR, GENERIC_500_MESSAGE
+                        )
                     return
 
                 # GET /api/projects/{project_id}/requirements/{req_id}/candidates
@@ -199,14 +220,176 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         self._send_error(HTTPStatus.NOT_FOUND, str(exc))
                     except ValueError as exc:
                         self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
-                    except Exception as exc:
+                    except Exception:
                         logger.exception(
                             "Error retrieving candidates for %s / %s",
                             project_id,
                             req_id,
                         )
-                        self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))
+                        self._send_error(
+                            HTTPStatus.INTERNAL_SERVER_ERROR, GENERIC_500_MESSAGE
+                        )
                     return
+
+                # GET /api/projects/{project_id}/requirements/{req_id}/decisions
+                if len(parts) == 6 and parts[5] == "decisions":
+                    target_id = query_params.get("target_id", [None])[0]
+                    if target_id is not None:
+                        try:
+                            unquoted_target = urllib.parse.unquote(target_id)
+                            decision_item = service.get_review_decision(
+                                project_id=project_id,
+                                requirement_id=req_id,
+                                target_id=unquoted_target,
+                            )
+                            if decision_item is None:
+                                self._send_error(
+                                    HTTPStatus.NOT_FOUND,
+                                    f"No review decision recorded for target "
+                                    f"'{unquoted_target}' in requirement '{req_id}'.",
+                                )
+                            else:
+                                self._send_json(HTTPStatus.OK, decision_item)
+                        except KeyError as exc:
+                            self._send_error(HTTPStatus.NOT_FOUND, str(exc))
+                        except Exception:
+                            logger.exception("Error fetching review decision")
+                            self._send_error(
+                                HTTPStatus.INTERNAL_SERVER_ERROR,
+                                GENERIC_500_MESSAGE,
+                            )
+                        return
+
+                    try:
+                        decisions = service.get_requirement_review_decisions(
+                            project_id=project_id,
+                            requirement_id=req_id,
+                        )
+                        self._send_json(HTTPStatus.OK, decisions)
+                    except KeyError as exc:
+                        self._send_error(HTTPStatus.NOT_FOUND, str(exc))
+                    except Exception:
+                        logger.exception("Error fetching requirement review decisions")
+                        self._send_error(
+                            HTTPStatus.INTERNAL_SERVER_ERROR, GENERIC_500_MESSAGE
+                        )
+                    return
+
+                # GET /api/projects/{project_id}/requirements/{req_id}/decisions/history
+                if (
+                    len(parts) == 7
+                    and parts[5] == "decisions"
+                    and parts[6] == "history"
+                ):
+                    target_id = query_params.get("target_id", [None])[0]
+                    try:
+                        unquoted_target = (
+                            urllib.parse.unquote(target_id)
+                            if target_id is not None
+                            else None
+                        )
+                        history = service.get_review_history(
+                            project_id=project_id,
+                            requirement_id=req_id,
+                            target_id=unquoted_target,
+                        )
+                        self._send_json(HTTPStatus.OK, history)
+                    except KeyError as exc:
+                        self._send_error(HTTPStatus.NOT_FOUND, str(exc))
+                    except Exception:
+                        logger.exception("Error fetching review history")
+                        self._send_error(
+                            HTTPStatus.INTERNAL_SERVER_ERROR, GENERIC_500_MESSAGE
+                        )
+                    return
+
+        self._send_error(HTTPStatus.NOT_FOUND, f"API endpoint not found: {path}")
+
+    def _handle_api_post(self, path: str) -> None:
+        """Dispatch API POST requests."""
+        service: TraceWiseService = getattr(self.server, "service")  # noqa: B009
+        content_length_str = self.headers.get("Content-Length")
+        if not content_length_str:
+            self._send_error(HTTPStatus.BAD_REQUEST, "Missing Content-Length header.")
+            return
+        try:
+            content_length = int(content_length_str)
+            if content_length < 0:
+                raise ValueError("Negative Content-Length")
+        except ValueError:
+            self._send_error(HTTPStatus.BAD_REQUEST, "Invalid Content-Length header.")
+            return
+
+        if content_length > 1_000_000:
+            self._send_error(HTTPStatus.BAD_REQUEST, "Payload too large.")
+            return
+
+        try:
+            raw_body = self.rfile.read(content_length)
+            payload = json.loads(raw_body.decode("utf-8"))
+        except Exception as exc:
+            self._send_error(HTTPStatus.BAD_REQUEST, f"Malformed JSON payload: {exc}")
+            return
+
+        if not isinstance(payload, dict):
+            self._send_error(HTTPStatus.BAD_REQUEST, "Payload must be a JSON object.")
+            return
+
+        parts = [p for p in path.strip("/").split("/") if p]
+        # Match: POST /api/projects/{project_id}/requirements/{req_id}/decisions
+        if (
+            len(parts) == 6
+            and parts[0] == "api"
+            and parts[1] == "projects"
+            and parts[3] == "requirements"
+            and parts[5] == "decisions"
+        ):
+            project_id = parts[2]
+            req_id = urllib.parse.unquote(parts[4])
+
+            target_id = payload.get("target_id")
+            if not target_id or not isinstance(target_id, str) or not target_id.strip():
+                self._send_error(
+                    HTTPStatus.BAD_REQUEST,
+                    "Field 'target_id' is required and must be a non-empty string.",
+                )
+                return
+
+            decision = payload.get("decision")
+            if not decision or not isinstance(decision, str) or not decision.strip():
+                self._send_error(
+                    HTTPStatus.BAD_REQUEST,
+                    "Field 'decision' is required and must be a non-empty string.",
+                )
+                return
+
+            rationale = payload.get("rationale", "")
+            if not isinstance(rationale, str):
+                self._send_error(
+                    HTTPStatus.BAD_REQUEST,
+                    "Field 'rationale' must be a string if provided.",
+                )
+                return
+
+            try:
+                saved = service.record_review_decision(
+                    project_id=project_id,
+                    requirement_id=req_id,
+                    target_id=target_id.strip(),
+                    decision=decision.strip(),
+                    rationale=rationale.strip(),
+                )
+                self._send_json(HTTPStatus.OK, saved)
+            except KeyError as exc:
+                self._send_error(HTTPStatus.NOT_FOUND, str(exc))
+            except ValueError as exc:
+                self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
+            except Exception:
+                logger.exception(
+                    "Error recording decision for %s / %s", project_id, req_id
+                )
+                self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, GENERIC_500_MESSAGE)
+            return
 
         self._send_error(HTTPStatus.NOT_FOUND, f"API endpoint not found: {path}")
 
@@ -255,10 +438,9 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
         try:
             body = file_path.read_bytes()
-        except Exception as exc:
-            self._send_error(
-                HTTPStatus.INTERNAL_SERVER_ERROR, f"Error reading file: {exc}"
-            )
+        except Exception:
+            logger.exception("Error reading static file %s", file_path)
+            self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, GENERIC_500_MESSAGE)
             return
 
         self.send_response(HTTPStatus.OK)
@@ -345,4 +527,9 @@ class TraceWiseDashboardServer:
         self.shutdown()
 
 
-__all__ = ["DashboardRequestHandler", "STATIC_DIR", "TraceWiseDashboardServer"]
+__all__ = [
+    "DashboardRequestHandler",
+    "GENERIC_500_MESSAGE",
+    "STATIC_DIR",
+    "TraceWiseDashboardServer",
+]

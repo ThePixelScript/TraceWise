@@ -14,6 +14,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from tracewise.dashboard.reviews import ReviewStore
 from tracewise.evaluation.adapters import ProjectIngestionAdapter
 from tracewise.evaluation.manifest import BenchmarkProjectManifest
 from tracewise.evaluation.project import BenchmarkProject
@@ -136,12 +137,14 @@ class TraceWiseService:
         self,
         manifest_paths: dict[str, Path | str] | None = None,
         checkpoint_dir: Path | str | None = None,
+        review_store: ReviewStore | None = None,
     ) -> None:
-        """Initialize the service with project manifests and checkpoint directory."""
+        """Initialize service with project manifests, checkpoints, and reviews."""
         self.manifest_paths: dict[str, Path] = {
             k: Path(v) for k, v in (manifest_paths or DEFAULT_MANIFEST_PATHS).items()
         }
         self.checkpoint_dir = Path(checkpoint_dir or DEFAULT_CHECKPOINT_DIR)
+        self.review_store = review_store or ReviewStore()
 
         # In-memory caches
         self._projects: dict[str, BenchmarkProject] = {}
@@ -202,6 +205,110 @@ class TraceWiseService:
             }
 
         return self._projects[project_id]
+
+    def _validate_project(self, project_id: str) -> BenchmarkProject:
+        """Validate project identifier and ensure project is loaded."""
+        return self.get_project_instance(project_id)
+
+    def _validate_requirement(
+        self, project_id: str, requirement_id: str
+    ) -> ProcessedText:
+        """Validate requirement identifier within a project."""
+        self._validate_project(project_id)
+        req_map = self._requirement_maps[project_id]
+        if requirement_id not in req_map:
+            raise KeyError(
+                f"Requirement '{requirement_id}' not found in project '{project_id}'."
+            )
+        return req_map[requirement_id]
+
+    def _validate_target(self, project_id: str, target_id: str) -> ProcessedText:
+        """Validate candidate source code target identifier within a project."""
+        self._validate_project(project_id)
+        source_map = self._source_maps[project_id]
+        if target_id not in source_map:
+            raise KeyError(
+                f"Candidate target '{target_id}' not found in project '{project_id}'."
+            )
+        return source_map[target_id]
+
+    def record_review_decision(
+        self,
+        project_id: str,
+        requirement_id: str,
+        target_id: str,
+        decision: str,
+        rationale: str = "",
+    ) -> dict[str, Any]:
+        """Record or revise a review decision for a trace link candidate.
+
+        Validates project, requirement, and candidate target identifiers against
+        active project artifacts. Responses are blinded of benchmark labels.
+        """
+        self._validate_project(project_id)
+        self._validate_requirement(project_id, requirement_id)
+        self._validate_target(project_id, target_id)
+
+        saved = self.review_store.record_decision(
+            project_id=project_id,
+            requirement_id=requirement_id,
+            target_id=target_id,
+            decision=decision,
+            rationale=rationale,
+        )
+        return saved.to_dict()
+
+    def get_review_decision(
+        self,
+        project_id: str,
+        requirement_id: str,
+        target_id: str,
+    ) -> dict[str, Any] | None:
+        """Fetch current review decision for a specific candidate link."""
+        self._validate_project(project_id)
+        self._validate_requirement(project_id, requirement_id)
+        self._validate_target(project_id, target_id)
+
+        decision = self.review_store.get_decision(
+            project_id=project_id,
+            requirement_id=requirement_id,
+            target_id=target_id,
+        )
+        return decision.to_dict() if decision else None
+
+    def get_requirement_review_decisions(
+        self,
+        project_id: str,
+        requirement_id: str,
+    ) -> list[dict[str, Any]]:
+        """Fetch all current recorded review decisions for a requirement."""
+        self._validate_project(project_id)
+        self._validate_requirement(project_id, requirement_id)
+
+        decisions = self.review_store.get_decisions_for_requirement(
+            project_id=project_id,
+            requirement_id=requirement_id,
+        )
+        return [d.to_dict() for d in decisions]
+
+    def get_review_history(
+        self,
+        project_id: str,
+        requirement_id: str,
+        target_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Fetch chronological audit history events for requirement decisions."""
+        self._validate_project(project_id)
+        self._validate_requirement(project_id, requirement_id)
+        if target_id is not None:
+            self._validate_target(project_id, target_id)
+
+        events = self.review_store.get_history(
+            project_id=project_id,
+            requirement_id=requirement_id,
+            target_id=target_id,
+        )
+        return [e.to_dict() for e in events]
 
     def get_project_details(self, project_id: str) -> dict[str, Any]:
         """Get comprehensive metadata and configuration for a specific project."""
@@ -446,6 +553,14 @@ class TraceWiseService:
                     }
                 )
 
+        # Fetch recorded developer decisions for this requirement
+        decisions_by_target = {
+            d.target_id: d
+            for d in self.review_store.get_decisions_for_requirement(
+                project_id, requirement_id
+            )
+        }
+
         # Enhance candidates with ground-truth and verification metadata
         enriched_candidates = []
         for cand in raw_candidates:
@@ -462,6 +577,18 @@ class TraceWiseService:
             else:
                 display_name = target_id
 
+            existing_decision = decisions_by_target.get(target_id)
+            if existing_decision is not None:
+                verif_status = existing_decision.decision
+                verif_note = existing_decision.rationale
+                verif_updated_at = existing_decision.updated_at
+                verif_rev_count = existing_decision.revision_count
+            else:
+                verif_status = "unverified"
+                verif_note = "Pending developer verification workflow (Milestone B6)"
+                verif_updated_at = None
+                verif_rev_count = 0
+
             enriched_candidates.append(
                 {
                     "rank": cand["rank"],
@@ -472,10 +599,10 @@ class TraceWiseService:
                     "is_gold_link": None if is_dev else is_gold,
                     # Explicit separation between hypothesis and verified link:
                     "candidate_type": "retrieval_hypothesis",
-                    "developer_verification_status": "unverified",
-                    "developer_verification_note": (
-                        "Pending developer verification workflow (Milestone B6)"
-                    ),
+                    "developer_verification_status": verif_status,
+                    "developer_verification_note": verif_note,
+                    "developer_verification_updated_at": verif_updated_at,
+                    "developer_verification_revision_count": verif_rev_count,
                     "code_preview": code_text,
                     "code_lines": len(code_text.splitlines()) if code_text else 0,
                     "code_chars": len(code_text),
@@ -516,6 +643,7 @@ __all__ = [
     "DEFAULT_CHECKPOINT_DIR",
     "DEFAULT_MANIFEST_PATHS",
     "RETRIEVAL_METHODS_CATALOG",
+    "ReviewStore",
     "TraceWiseService",
     "extract_title_from_requirement",
 ]

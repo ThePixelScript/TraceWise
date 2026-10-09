@@ -32,7 +32,14 @@ Thumbs.db
 # Generated data
 data/raw/
 data/processed/
+data/reviews/
 experiments/results/
+scratch/
+
+# Database files
+*.sqlite
+*.sqlite3
+*.db
 
 # Secrets
 .env.*
