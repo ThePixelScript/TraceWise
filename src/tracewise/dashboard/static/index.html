@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TraceWise Dashboard V0 — Traceability Retrieval Inspection</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Clean, Calm Header with Essential Controls -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">TW</span>
+        <div class="brand-info">
+          <div class="brand-title-row">
+            <span class="brand-name">TraceWise</span>
+            <span class="version-tag">Dashboard V0</span>
+          </div>
+          <span class="brand-subtitle">Requirement-to-Code Traceability Inspection</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Essential Controls Bar (Unobtrusive & Accessible) -->
+    <div class="header-controls" role="toolbar" aria-label="Dashboard controls">
+      <div class="control-item">
+        <label for="project-select" class="control-label">Project</label>
+        <select id="project-select" class="form-select" aria-label="Select benchmark dataset or project">
+          <option value="" disabled selected>Loading projects...</option>
+        </select>
+      </div>
+
+      <div class="control-item">
+        <label for="mode-select" class="control-label">Operating Mode</label>
+        <select id="mode-select" class="form-select mode-select" aria-label="Select operating mode">
+          <option value="evaluation" selected>🔬 Research / Evaluation Mode</option>
+          <option value="developer">💼 Developer Workflow Mode (Blinded)</option>
+        </select>
+      </div>
+
+      <div class="control-item">
+        <label for="method-select" class="control-label">Retrieval Method</label>
+        <select id="method-select" class="form-select" aria-label="Select retrieval baseline algorithm">
+          <option value="b1_bm25" selected>B1 BM25 (Lexical, k1=1.5, b=0.75)</option>
+          <option value="b0_tfidf">B0 TF-IDF (Vector Space Model)</option>
+          <option value="b2_semantic">B2 Dense Semantic (BGE Embeddings)</option>
+          <option value="b3_structural">B3 Structural (AST + Lexical)</option>
+          <option value="b4_hybrid">B4 Hybrid Fusion (BM25 + Semantic)</option>
+          <option value="b5_llm_rerank">B5 LLM Reranking (BM25 + qwen3.5:9b)</option>
+        </select>
+      </div>
+
+      <div class="control-item">
+        <label for="topk-select" class="control-label">Cutoff Pool</label>
+        <select id="topk-select" class="form-select cutoff-select" aria-label="Select candidate cutoff pool">
+          <option value="5">Top 5</option>
+          <option value="10">Top 10</option>
+          <option value="20" selected>Top 20</option>
+        </select>
+      </div>
+
+      <div class="control-actions">
+        <button id="refresh-btn" class="btn btn-secondary" title="Refresh project data" aria-label="Refresh data">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+          <span>Refresh</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Global Error Notification -->
+  <div id="error-banner" class="alert alert-error" style="display: none;" role="alert" aria-live="assertive">
+    <div class="alert-icon" aria-hidden="true">⚠️</div>
+    <div class="alert-content">
+      <strong id="error-title">Error</strong>
+      <span id="error-message">An unexpected error occurred.</span>
+    </div>
+    <button id="error-dismiss-btn" class="alert-close" aria-label="Dismiss error">&times;</button>
+  </div>
+
+  <!-- Main Focused Workspace: 3 Core Areas -->
+  <div class="workspace-layout">
+    <!-- Area 1: Requirement Navigation Sidebar -->
+    <aside class="sidebar-panel" aria-label="Requirement Navigation">
+      <div class="sidebar-header">
+        <div class="sidebar-title-row">
+          <h2 class="sidebar-title">Requirements</h2>
+          <span id="req-count-badge" class="count-badge" aria-label="Requirement count">0</span>
+        </div>
+
+        <div class="search-box">
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="req-search-input" placeholder="Search by ID or title..." autocomplete="off" aria-label="Search requirements by ID or title">
+          <button id="clear-search-btn" class="clear-btn" style="display: none;" aria-label="Clear search">&times;</button>
+        </div>
+
+        <!-- Mode-aware Filter Tabs (Hidden in Developer Mode) -->
+        <div id="filter-tabs-container" class="filter-tabs" role="tablist" aria-label="Requirement filters">
+          <button class="filter-tab active" data-filter="all" role="tab" aria-selected="true">All</button>
+          <button class="filter-tab" data-filter="evaluable" role="tab" aria-selected="false">With Gold Links</button>
+          <button class="filter-tab" data-filter="zero" role="tab" aria-selected="false">Zero-Link</button>
+        </div>
+      </div>
+
+      <div class="sidebar-content">
+        <div id="req-loading-indicator" class="loading-state" style="display: none;" role="status" aria-live="polite">
+          <div class="spinner"></div>
+          <span>Loading requirements...</span>
+        </div>
+
+        <div id="req-empty-state" class="empty-state" style="display: none;" role="status">
+          <p id="req-empty-message">No requirements match the search filter.</p>
+        </div>
+
+        <ul id="requirements-list" class="requirements-list" role="listbox" aria-label="Requirements list">
+          <!-- Populated dynamically -->
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Main Content Area: Areas 2 & 3 -->
+    <main class="main-inspector" aria-label="Requirement details and candidate code matches">
+      <!-- Area 2: Selected Requirement Detail Card -->
+      <article id="requirement-detail-card" class="card req-detail-card" style="display: none;" aria-labelledby="detail-req-title">
+        <div class="req-detail-header">
+          <div class="req-id-group">
+            <span id="detail-req-id" class="req-id-pill">REQ-???</span>
+            <span id="detail-evaluable-badge" class="badge badge-subtle badge-success">Evaluable Query</span>
+            <span id="detail-gold-count-badge" class="badge badge-subtle badge-info">0 Gold Links</span>
+          </div>
+          <h2 id="detail-req-title" class="req-title-heading">Requirement Title</h2>
+        </div>
+
+        <div class="req-detail-body">
+          <div class="spec-text-container">
+            <div class="field-label">Specification Text</div>
+            <div id="detail-req-text" class="spec-text-content"></div>
+          </div>
+
+          <!-- Official Benchmark Ground Truth (Visible ONLY in Research Mode) -->
+          <div id="detail-gold-links-section" class="gold-links-section" style="display: none;">
+            <div class="field-label">Benchmark Ground Truth Links</div>
+            <div id="detail-gold-links-list" class="gold-links-list">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Purposeful Notice Banner -->
+      <div id="verification-notice" class="notice-banner" style="display: none;" role="note">
+        <div class="notice-icon" aria-hidden="true">ℹ️</div>
+        <div class="notice-text">
+          <strong id="notice-heading">Candidate Hypotheses vs. Benchmark Ground Truth</strong>
+          <p id="notice-body">
+            Candidates shown below are algorithmic hypotheses retrieved by the active model.
+            Matches with benchmark ground truth indicate verified dataset trace links.
+          </p>
+        </div>
+      </div>
+
+      <!-- Area 3: Ranked Source-Code Candidate Hypotheses -->
+      <section id="candidates-container" class="candidates-section" style="display: none;" aria-labelledby="candidates-section-title">
+        <div class="candidates-section-header">
+          <div class="candidates-header-left">
+            <h3 id="candidates-section-title" class="candidates-heading">
+              Ranked Code Candidates
+            </h3>
+            <span id="candidates-count-subtitle" class="candidates-subtitle">
+              Showing top candidates for this requirement
+            </span>
+          </div>
+
+          <div class="retrieval-telemetry" role="status">
+            <span id="telemetry-matched" class="telemetry-badge telemetry-gold">0 / 0 Gold Retrieved</span>
+            <span id="telemetry-time" class="telemetry-badge telemetry-time">0.0 ms</span>
+            <span id="telemetry-cached" class="telemetry-badge telemetry-cached" style="display: none;">Cached Checkpoint</span>
+          </div>
+        </div>
+
+        <div id="method-summary-note" class="method-summary-note">
+          Retrieval model: Okapi BM25 lexical ranking
+        </div>
+
+        <div id="candidates-loading" class="loading-state" style="display: none;" role="status" aria-live="polite">
+          <div class="spinner"></div>
+          <span>Retrieving candidate code matches...</span>
+        </div>
+
+        <div id="candidates-empty" class="empty-state" style="display: none;" role="status">
+          <div class="empty-icon" aria-hidden="true">📂</div>
+          <h4>No Candidate Matches</h4>
+          <p>No candidates were returned for this requirement with the current parameters.</p>
+        </div>
+
+        <!-- Scannable Candidate Cards List -->
+        <div id="candidates-list" class="candidates-list" role="feed" aria-label="Ranked code candidates">
+          <!-- Populated dynamically -->
+        </div>
+
+        <!-- Progressive Disclosure: Show More Candidates Button -->
+        <div id="reveal-container" class="reveal-container" style="display: none;">
+          <button id="btn-reveal-candidates" class="btn btn-secondary btn-reveal" aria-expanded="false">
+            <span id="reveal-btn-text">Show more candidates</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Clean Welcome State (Before any requirement is selected) -->
+      <div id="welcome-state" class="welcome-card" role="region" aria-label="Welcome guide">
+        <div class="welcome-icon" aria-hidden="true">🔍</div>
+        <h3>Select a Requirement to Inspect Code Matches</h3>
+        <p>
+          Choose a requirement from the left navigator to inspect its specification text,
+          ranked candidate source-code matches, relevance scores, and code previews.
+        </p>
+        <div class="welcome-guide-grid">
+          <div class="guide-item">
+            <strong>1. Select Dataset</strong>
+            <span>Switch between sample_project (Python), iTrust (Java EHR), and eTour (Java Tourism).</span>
+          </div>
+          <div class="guide-item">
+            <strong>2. Choose Baseline</strong>
+            <span>Inspect B1 BM25, B5 LLM Reranking, B0 TF-IDF, B2 Semantic, B3 Structural, or B4 Hybrid.</span>
+          </div>
+          <div class="guide-item">
+            <strong>3. Inspect Code</strong>
+            <span>Expand candidate code previews on demand without visual clutter.</span>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Clean, Calm Footer -->
+  <footer class="app-footer">
+    <div class="footer-left">
+      <span>TraceWise Research Platform &bull; Controlled IR Traceability Benchmarks</span>
+    </div>
+    <div class="footer-right">
+      <span id="active-mode-label">🔬 Research Mode</span>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
