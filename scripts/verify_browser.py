@@ -19,6 +19,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from tracewise.dashboard.reviews import ReviewStore
 from tracewise.dashboard.server import TraceWiseDashboardServer
 from tracewise.dashboard.service import TraceWiseService
 
@@ -155,8 +156,16 @@ class ChromeCDPClient:
 
 def run_browser_verification() -> dict[str, Any]:
     """Execute real-browser acceptance test for TraceWise Dashboard V0."""
+    # Temporary profile and review store for test isolation
+    profile_dir = Path("scratch/chrome_verification_profile").resolve()
+    shutil.rmtree(profile_dir, ignore_errors=True)
+    profile_dir.mkdir(parents=True, exist_ok=True)
+
+    browser_review_db = profile_dir / "browser_reviews.db"
+    review_store = ReviewStore(browser_review_db)
+
     logger.info("Starting local TraceWise Dashboard Server on ephemeral port...")
-    service = TraceWiseService()
+    service = TraceWiseService(review_store=review_store)
     server = TraceWiseDashboardServer(host="127.0.0.1", port=0, service=service)
     server.start(in_thread=True)
     server_url = server.url
@@ -164,9 +173,6 @@ def run_browser_verification() -> dict[str, Any]:
 
     # Launch Chrome
     chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-    profile_dir = Path("scratch/chrome_verification_profile").resolve()
-    shutil.rmtree(profile_dir, ignore_errors=True)
-    profile_dir.mkdir(parents=True, exist_ok=True)
 
     cdp_port = 9333
     chrome_cmd = [
@@ -619,8 +625,229 @@ def run_browser_verification() -> dict[str, Any]:
         logger.info("Search filter and empty state verified successfully.")
         results["steps"].append("search_empty_state_ok")
 
-        # Step 11: Verify Browser Console Errors
-        logger.info("[Step 11] Inspecting browser console for errors...")
+        # Step 12: Verify Developer Review Decision Workflow (Milestone B6.2)
+        logger.info("[Step 12] Testing developer review decision workflow...")
+
+        # 12a: Verify review action buttons exist on candidate cards in developer mode
+        action_bars_count = client.eval_js(
+            "document.querySelectorAll('.review-action-bar').length"
+        )
+        assert action_bars_count >= 5, (
+            f"Expected candidate review action bars in developer mode, "
+            f"got {action_bars_count}"
+        )
+
+        # 12b: Click Accept on candidate #1 to open inline review form
+        client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".btn-review-accept').click()"
+        )
+        wait_until(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".review-form-panel').style.display === 'flex'",
+            True,
+        )
+
+        form_title = client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".review-form-title').textContent"
+        )
+        assert "Accept" in form_title, (
+            f"Expected Accept in form title, got {form_title}"
+        )
+
+        # 12c: Test validation: Click Save Decision with empty rationale
+        client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".btn-save-decision').click()"
+        )
+        time.sleep(0.2)
+        error_display = client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".review-form-error').style.display"
+        )
+        assert error_display != "none", (
+            "Error alert should be visible when required rationale is empty"
+        )
+        error_text = client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".review-form-error').textContent"
+        )
+        assert "rationale is required" in error_text.lower(), (
+            f"Expected required rationale error message, got {error_text}"
+        )
+
+        # Candidate status badge should remain 'Pending Review' (no optimistic update)
+        current_badge = client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".badge-verification-status').textContent"
+        )
+        assert "Pending Review" in current_badge, (
+            f"Badge should not update optimistically on failed validation: "
+            f"{current_badge}"
+        )
+
+        # 12d: Type non-empty rationale and save decision
+        client.eval_js("""(() => {
+            const card = document.querySelector('.candidate-card[data-rank="1"]');
+            const ta = card.querySelector('.review-form-textarea');
+            ta.value = "Verified auth service handles password validation.";
+            ta.dispatchEvent(new Event('input'));
+        })()""")
+        client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".btn-save-decision').click()"
+        )
+
+        # Wait until review form panel closes upon successful submission
+        wait_until(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".review-form-panel').style.display === 'none'",
+            True,
+        )
+
+        # Confirm badge updated to '✓ Accepted'
+        updated_badge = client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".badge-verification-status').textContent"
+        )
+        assert "Accepted" in updated_badge, (
+            f"Expected Accepted badge, got {updated_badge}"
+        )
+
+        # Confirm confirmed banner displays rationale
+        confirmed_rationale = client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".review-rationale-text').textContent"
+        )
+        assert (
+            "Verified auth service handles password validation." in confirmed_rationale
+        ), f"Rationale not displayed in confirmed banner: {confirmed_rationale}"
+
+        # Confirm history button shows '(1)'
+        hist_btn_text = client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".btn-review-history').textContent"
+        )
+        assert "(1)" in hist_btn_text, (
+            f"Expected (1) in history button text, got {hist_btn_text}"
+        )
+
+        # 12e: Test persistence: Switch to REQ-001 and back to REQ-002
+        logger.info("Testing decision persistence across requirement navigation...")
+        client.eval_js("document.querySelectorAll('.req-item')[0].click()")
+        wait_until(
+            "document.getElementById('detail-req-id').textContent === 'REQ-001'", True
+        )
+
+        client.eval_js("document.querySelectorAll('.req-item')[1].click()")
+        wait_until(
+            "document.getElementById('detail-req-id').textContent === 'REQ-002'", True
+        )
+        persisted_badge = wait_until(
+            "(() => {"
+            '  const b = document.querySelector(\'.candidate-card[data-rank="1"] '
+            "  .badge-verification-status');"
+            "  return b ? b.textContent : '';"
+            "})()",
+            expected="✓ Accepted",
+        )
+        assert "Accepted" in persisted_badge, (
+            f"Expected Accepted badge persisted after navigation, got {persisted_badge}"
+        )
+
+        persisted_rationale = client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".review-rationale-text').textContent"
+        )
+        assert "Verified auth service" in persisted_rationale, (
+            f"Rationale lost after navigation: {persisted_rationale}"
+        )
+
+        # 12f: Test decision audit history inspection
+        logger.info("Testing decision audit history viewer...")
+        client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".btn-review-history').click()"
+        )
+        wait_until(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".review-history-panel').style.display === 'block'",
+            True,
+        )
+        wait_until(
+            'document.querySelectorAll(\'.candidate-card[data-rank="1"] '
+            ".history-item').length > 0",
+            True,
+        )
+
+        history_items_count = client.eval_js(
+            'document.querySelectorAll(\'.candidate-card[data-rank="1"] '
+            ".history-item').length"
+        )
+        assert history_items_count == 1, (
+            f"Expected 1 history item, got {history_items_count}"
+        )
+
+        history_item_text = client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".history-item').textContent"
+        )
+        assert "Revision 1" in history_item_text, (
+            f"Expected Revision 1 in history item: {history_item_text}"
+        )
+        assert "Accepted" in history_item_text, (
+            f"Expected Accepted in history item: {history_item_text}"
+        )
+
+        # Close history panel
+        client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".btn-review-history').click()"
+        )
+        wait_until(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".review-history-panel').style.display === 'none'",
+            True,
+        )
+
+        # 12g: Verify mode isolation: Switch back to Research/Evaluation mode
+        logger.info(
+            "Testing mode isolation: review controls hidden in Research Mode..."
+        )
+        client.eval_js("""(() => {
+            const sel = document.getElementById('mode-select');
+            sel.value = 'evaluation';
+            sel.dispatchEvent(new Event('change'));
+        })()""")
+        wait_until(
+            "document.getElementById('active-mode-label')"
+            ".textContent.includes('Research Mode')",
+            True,
+        )
+        time.sleep(0.5)
+
+        eval_action_bars = client.eval_js(
+            "document.querySelectorAll('.review-action-bar').length"
+        )
+        assert eval_action_bars == 0, (
+            f"Expected 0 review action bars in Research Mode, got {eval_action_bars}"
+        )
+
+        # Verify benchmark ground truth section restored in Evaluation Mode
+        eval_gold_section = client.eval_js(
+            "document.getElementById('detail-gold-links-section')"
+            ".style.display !== 'none'"
+        )
+        assert eval_gold_section, (
+            "Evaluation Mode should restore benchmark ground truth links section"
+        )
+
+        logger.info("Developer review decision workflow and mode isolation verified.")
+        results["steps"].append("developer_review_workflow_ok")
+
+        # Step 13: Verify Browser Console Errors
+        logger.info("[Step 13] Inspecting browser console for errors...")
         time.sleep(0.5)
         # Drain remaining messages
         while True:

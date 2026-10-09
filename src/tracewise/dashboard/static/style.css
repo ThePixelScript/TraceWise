@@ -253,6 +253,23 @@ body {
   border-color: var(--text-muted);
 }
 
+.btn-primary {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+.btn-sm {
+  height: 28px;
+  padding: 0 0.6rem;
+  font-size: 0.75rem;
+}
+
 /* ==========================================================================
    Alert Banners
    ========================================================================== */
@@ -824,6 +841,34 @@ body {
   border-radius: 9999px;
 }
 
+.badge-verification-status.status-accepted {
+  background-color: var(--success-bg);
+  color: var(--success-text);
+  border-color: var(--success-border);
+  font-weight: 600;
+}
+
+.badge-verification-status.status-rejected {
+  background-color: var(--error-bg);
+  color: var(--error-text);
+  border-color: var(--error-border);
+  font-weight: 600;
+}
+
+.badge-verification-status.status-needs-review {
+  background-color: #fffbeb;
+  color: #92400e;
+  border-color: #fde68a;
+  font-weight: 600;
+}
+
+.badge-verification-status.status-pending {
+  background-color: var(--review-bg);
+  color: var(--review-text);
+  border-color: var(--review-border);
+  font-weight: 500;
+}
+
 /* Candidate Metadata Row */
 .candidate-meta-row {
   display: flex;
@@ -924,6 +969,322 @@ body {
   color: #f1f5f9;
   overflow-x: auto;
   white-space: pre;
+}
+
+/* ==========================================================================
+   Developer Review Workflow Components (Milestone B6.2)
+   ========================================================================== */
+
+/* Confirmed Decision Banner */
+.review-confirmed-banner {
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-md);
+  padding: 0.55rem 0.8rem;
+  margin-top: 0.65rem;
+  font-size: 0.775rem;
+}
+
+.review-confirmed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem;
+}
+
+.review-confirmed-title {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.review-confirmed-title strong {
+  color: var(--text-primary);
+}
+
+.review-timestamp {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.review-rev-pill {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: 9999px;
+  background-color: var(--bg-muted);
+  color: var(--text-secondary);
+}
+
+.review-rationale-text {
+  color: var(--text-primary);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.review-rationale-text strong {
+  color: var(--text-secondary);
+}
+
+/* Review Action Bar */
+.review-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.btn-review-action {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-family: var(--font-sans);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.15s ease;
+}
+
+.btn-review-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-review-accept {
+  background-color: var(--success-bg);
+  color: var(--success-text);
+  border-color: var(--success-border);
+}
+
+.btn-review-accept:hover:not(:disabled) {
+  background-color: #dcfce7;
+  border-color: #86efac;
+}
+
+.btn-review-reject {
+  background-color: var(--error-bg);
+  color: var(--error-text);
+  border-color: var(--error-border);
+}
+
+.btn-review-reject:hover:not(:disabled) {
+  background-color: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.btn-review-needs {
+  background-color: #fffbeb;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.btn-review-needs:hover:not(:disabled) {
+  background-color: #fef3c7;
+  border-color: #fcd34d;
+}
+
+.btn-review-history {
+  background-color: var(--bg-subtle);
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+}
+
+.btn-review-history:hover:not(:disabled) {
+  background-color: var(--bg-muted);
+  color: var(--text-primary);
+}
+
+/* Inline Review Form Panel */
+.review-form-panel {
+  margin-top: 0.65rem;
+  padding: 0.85rem;
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.review-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.review-form-title {
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.review-form-target {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  word-break: break-all;
+}
+
+.review-form-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.required-indicator {
+  color: var(--error-text);
+  font-weight: 600;
+  font-size: 0.72rem;
+}
+
+.optional-indicator {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: normal;
+}
+
+.review-form-textarea {
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  resize: vertical;
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+.review-form-textarea:focus {
+  border-color: var(--border-focus);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.review-form-error {
+  background-color: var(--error-bg);
+  border: 1px solid var(--error-border);
+  color: var(--error-text);
+  padding: 0.4rem 0.65rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.review-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-save-decision {
+  padding: 0.35rem 0.85rem;
+  font-size: 0.775rem;
+  height: 32px;
+}
+
+.btn-cancel-decision {
+  padding: 0.35rem 0.85rem;
+  font-size: 0.775rem;
+  height: 32px;
+}
+
+/* History Audit Drawer */
+.review-history-panel {
+  margin-top: 0.65rem;
+  padding: 0.85rem;
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.history-header {
+  margin-bottom: 0.6rem;
+}
+
+.history-title {
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.history-title code {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+.history-empty {
+  font-size: 0.775rem;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 0.5rem 0;
+}
+
+.history-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.history-item {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.7rem;
+  font-size: 0.75rem;
+}
+
+.history-item-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.3rem;
+}
+
+.history-rev-tag {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  background-color: var(--bg-subtle);
+  color: var(--text-secondary);
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.history-timestamp {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.history-item-body {
+  color: var(--text-primary);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.history-item-body strong {
+  color: var(--text-secondary);
 }
 
 /* Progressive Disclosure: Reveal More Candidates Button */

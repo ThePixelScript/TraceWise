@@ -111,6 +111,34 @@
     return res.json();
   }
 
+  function escapeHtml(str) {
+    if (!str) return "";
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function formatTimestamp(isoStr) {
+    if (!isoStr) return "";
+    try {
+      const d = new Date(isoStr);
+      if (isNaN(d.getTime())) return isoStr;
+      return d.toLocaleString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+    } catch (_) {
+      return isoStr;
+    }
+  }
+
   // --- Application Initialization ---
 
   async function init() {
@@ -284,6 +312,13 @@
       document.querySelectorAll(".badge-gold-link").forEach((el) => el.remove());
       document.querySelectorAll(".badge-gold-match").forEach((el) => el.remove());
       document.querySelectorAll(".badge-unlinked").forEach((el) => el.remove());
+    } else {
+      // In Research/Evaluation mode, remove any developer review controls
+      document
+        .querySelectorAll(
+          ".review-action-bar, .review-form-panel, .review-history-panel, .review-confirmed-banner"
+        )
+        .forEach((el) => el.remove());
     }
 
     // Informative, calm notice banner update
@@ -529,6 +564,11 @@
         `/api/projects/${state.activeProjectId}/requirements/${encodeURIComponent(requirementId)}?mode=${encodeURIComponent(state.mode)}`
       );
 
+      // Discard response if another requirement became active in the meantime
+      if (state.activeRequirementId !== requirementId) {
+        return;
+      }
+
       elements.detailReqId.textContent = detail.requirement_id;
       elements.detailReqTitle.textContent = detail.title || detail.requirement_id;
       elements.detailReqText.textContent = detail.text;
@@ -605,6 +645,11 @@
     try {
       const url = `/api/projects/${state.activeProjectId}/requirements/${encodeURIComponent(requirementId)}/candidates?method=${encodeURIComponent(state.activeMethodId)}&top_k=${state.activeTopK}&mode=${encodeURIComponent(state.mode)}`;
       const data = await fetchJson(url);
+
+      // Discard responses from stale/superseded queries if user switched requirement
+      if (state.activeRequirementId !== requirementId) {
+        return;
+      }
 
       const isDev = state.mode === "developer";
 
@@ -734,9 +779,24 @@
       // Verification Status Badge
       const verifBadge = document.createElement("span");
       verifBadge.className = "badge-verification-status";
-      verifBadge.textContent = isDev
-        ? "⏳ Pending Review"
-        : "⏳ Unverified (Milestone B6)";
+      if (isDev) {
+        const devStatus = cand.developer_verification_status || "unverified";
+        if (devStatus === "accepted") {
+          verifBadge.className = "badge-verification-status status-accepted";
+          verifBadge.textContent = "✓ Accepted";
+        } else if (devStatus === "rejected") {
+          verifBadge.className = "badge-verification-status status-rejected";
+          verifBadge.textContent = "✗ Rejected";
+        } else if (devStatus === "needs_review") {
+          verifBadge.className = "badge-verification-status status-needs-review";
+          verifBadge.textContent = "⏳ Needs Review";
+        } else {
+          verifBadge.className = "badge-verification-status status-pending";
+          verifBadge.textContent = "⏳ Pending Review";
+        }
+      } else {
+        verifBadge.textContent = "⏳ Unverified (Milestone B6)";
+      }
       badgeGroup.appendChild(verifBadge);
 
       header.appendChild(idGroup);
@@ -787,6 +847,419 @@
       }
 
       card.appendChild(metaRow);
+
+      // Developer Review Workflow Components (Visible ONLY in Developer Workflow Mode)
+      if (isDev) {
+        // 1. Confirmed Review Decision Banner
+        const confirmedBanner = document.createElement("div");
+        confirmedBanner.className = "review-confirmed-banner";
+
+        const confirmedHeader = document.createElement("div");
+        confirmedHeader.className = "review-confirmed-header";
+
+        const confirmedTitle = document.createElement("span");
+        confirmedTitle.className = "review-confirmed-title";
+
+        const confirmedRevPill = document.createElement("span");
+        confirmedRevPill.className = "review-rev-pill";
+
+        const confirmedTime = document.createElement("span");
+        confirmedTime.className = "review-timestamp";
+
+        confirmedHeader.appendChild(confirmedTitle);
+        confirmedHeader.appendChild(confirmedRevPill);
+        confirmedHeader.appendChild(confirmedTime);
+
+        const confirmedRationale = document.createElement("div");
+        confirmedRationale.className = "review-rationale-text";
+
+        confirmedBanner.appendChild(confirmedHeader);
+        confirmedBanner.appendChild(confirmedRationale);
+
+        function updateConfirmedBannerContent(status, rationale, updatedAt, revCount) {
+          if (!status || status === "unverified") {
+            confirmedBanner.style.display = "none";
+            return;
+          }
+          confirmedBanner.style.display = "block";
+          let statusLabel = status;
+          if (status === "accepted") statusLabel = "Accepted";
+          else if (status === "rejected") statusLabel = "Rejected";
+          else if (status === "needs_review") statusLabel = "Needs Review";
+
+          confirmedTitle.innerHTML = `Review Decision: <strong>${escapeHtml(statusLabel)}</strong>`;
+          confirmedTime.textContent = updatedAt ? `Updated: ${formatTimestamp(updatedAt)}` : "";
+          if (revCount && revCount > 0) {
+            confirmedRevPill.textContent = `Revision ${revCount}`;
+            confirmedRevPill.style.display = "inline-block";
+          } else {
+            confirmedRevPill.style.display = "none";
+          }
+
+          if (rationale && rationale.trim()) {
+            confirmedRationale.innerHTML = `<strong>Rationale:</strong> ${escapeHtml(rationale)}`;
+            confirmedRationale.style.display = "block";
+          } else {
+            confirmedRationale.textContent = "";
+            confirmedRationale.style.display = "none";
+          }
+        }
+
+        const initialStatus = cand.developer_verification_status || "unverified";
+        if (initialStatus !== "unverified") {
+          updateConfirmedBannerContent(
+            cand.developer_verification_status,
+            cand.developer_verification_note,
+            cand.developer_verification_updated_at,
+            cand.developer_verification_revision_count
+          );
+        } else {
+          confirmedBanner.style.display = "none";
+        }
+
+        // 2. Review Action Bar
+        const reviewActionBar = document.createElement("div");
+        reviewActionBar.className = "review-action-bar";
+        reviewActionBar.setAttribute("role", "toolbar");
+        reviewActionBar.setAttribute("aria-label", `Review actions for candidate ${cand.target_id}`);
+
+        const btnAccept = document.createElement("button");
+        btnAccept.type = "button";
+        btnAccept.className = "btn-review-action btn-review-accept";
+        btnAccept.innerHTML = "✓ Accept";
+        btnAccept.setAttribute("aria-label", `Mark candidate ${cand.target_id} as accepted`);
+
+        const btnReject = document.createElement("button");
+        btnReject.type = "button";
+        btnReject.className = "btn-review-action btn-review-reject";
+        btnReject.innerHTML = "✗ Reject";
+        btnReject.setAttribute("aria-label", `Mark candidate ${cand.target_id} as rejected`);
+
+        const btnNeedsReview = document.createElement("button");
+        btnNeedsReview.type = "button";
+        btnNeedsReview.className = "btn-review-action btn-review-needs";
+        btnNeedsReview.innerHTML = "⏳ Needs Review";
+        btnNeedsReview.setAttribute("aria-label", `Mark candidate ${cand.target_id} as needs review`);
+
+        const btnHistory = document.createElement("button");
+        btnHistory.type = "button";
+        btnHistory.className = "btn-review-action btn-review-history";
+        const revCount = cand.developer_verification_revision_count || 0;
+        btnHistory.innerHTML = `📜 History${revCount > 0 ? ` (${revCount})` : ""}`;
+        btnHistory.setAttribute("aria-expanded", "false");
+        btnHistory.setAttribute("aria-label", `View decision history for ${cand.target_id}`);
+
+        reviewActionBar.appendChild(btnAccept);
+        reviewActionBar.appendChild(btnReject);
+        reviewActionBar.appendChild(btnNeedsReview);
+        reviewActionBar.appendChild(btnHistory);
+
+        // 3. Inline Review Form Panel
+        const reviewFormPanel = document.createElement("div");
+        reviewFormPanel.className = "review-form-panel";
+        reviewFormPanel.style.display = "none";
+        reviewFormPanel.setAttribute("role", "region");
+        reviewFormPanel.setAttribute("aria-label", "Record review decision form");
+
+        let currentDecisionAction = null;
+
+        const formHeader = document.createElement("div");
+        formHeader.className = "review-form-header";
+
+        const formTitle = document.createElement("strong");
+        formTitle.className = "review-form-title";
+
+        const formTarget = document.createElement("span");
+        formTarget.className = "review-form-target";
+        formTarget.innerHTML = `Target: <code>${escapeHtml(cand.target_id)}</code>`;
+
+        formHeader.appendChild(formTitle);
+        formHeader.appendChild(formTarget);
+
+        const formLabel = document.createElement("label");
+        formLabel.className = "review-form-label";
+        const textareaId = `review-rationale-${cand.rank}-${Math.random().toString(36).slice(2, 7)}`;
+        formLabel.setAttribute("for", textareaId);
+
+        const formTextarea = document.createElement("textarea");
+        formTextarea.id = textareaId;
+        formTextarea.className = "review-form-textarea";
+        formTextarea.rows = 3;
+
+        const formError = document.createElement("div");
+        formError.className = "review-form-error";
+        formError.setAttribute("role", "alert");
+        formError.style.display = "none";
+
+        const formActions = document.createElement("div");
+        formActions.className = "review-form-actions";
+
+        const btnSaveDecision = document.createElement("button");
+        btnSaveDecision.type = "button";
+        btnSaveDecision.className = "btn btn-primary btn-save-decision";
+        btnSaveDecision.textContent = "Save Decision";
+
+        const btnCancelDecision = document.createElement("button");
+        btnCancelDecision.type = "button";
+        btnCancelDecision.className = "btn btn-secondary btn-cancel-decision";
+        btnCancelDecision.textContent = "Cancel";
+
+        formActions.appendChild(btnSaveDecision);
+        formActions.appendChild(btnCancelDecision);
+
+        reviewFormPanel.appendChild(formHeader);
+        reviewFormPanel.appendChild(formLabel);
+        reviewFormPanel.appendChild(formTextarea);
+        reviewFormPanel.appendChild(formError);
+        reviewFormPanel.appendChild(formActions);
+
+        // 4. History Panel
+        const historyPanel = document.createElement("div");
+        historyPanel.className = "review-history-panel";
+        historyPanel.style.display = "none";
+        historyPanel.setAttribute("role", "region");
+        historyPanel.setAttribute("aria-label", "Decision audit history");
+
+        const historyHeader = document.createElement("div");
+        historyHeader.className = "history-header";
+        historyHeader.innerHTML = `<span class="history-title">Decision Audit History: <code>${escapeHtml(cand.target_id)}</code></span>`;
+
+        const historyBody = document.createElement("div");
+        historyBody.className = "history-body";
+
+        historyPanel.appendChild(historyHeader);
+        historyPanel.appendChild(historyBody);
+
+        function openReviewForm(action) {
+          if (reviewFormPanel.style.display === "flex" && currentDecisionAction === action) {
+            closeReviewForm();
+            return;
+          }
+
+          closeHistoryPanel();
+          currentDecisionAction = action;
+          formError.style.display = "none";
+          formError.textContent = "";
+
+          const isRequired = action === "accepted" || action === "rejected";
+          let actionLabel = action;
+          if (action === "accepted") actionLabel = "Accept (✓)";
+          else if (action === "rejected") actionLabel = "Reject (✗)";
+          else if (action === "needs_review") actionLabel = "Needs Review (⏳)";
+
+          formTitle.textContent = `Record Decision: ${actionLabel}`;
+          formLabel.innerHTML = isRequired
+            ? `Decision Rationale <span class="required-indicator">* Required</span>`
+            : `Decision Rationale <span class="optional-indicator">(Optional)</span>`;
+
+          formTextarea.placeholder = isRequired
+            ? `Enter technical justification for marking candidate as ${action} (required)...`
+            : `Enter optional notes or open questions for further investigation...`;
+
+          if (cand.developer_verification_note && cand.developer_verification_status === action) {
+            formTextarea.value = cand.developer_verification_note;
+          } else {
+            formTextarea.value = "";
+          }
+
+          reviewFormPanel.style.display = "flex";
+          formTextarea.focus();
+        }
+
+        function closeReviewForm() {
+          reviewFormPanel.style.display = "none";
+          currentDecisionAction = null;
+          formError.style.display = "none";
+          formError.textContent = "";
+        }
+
+        function closeHistoryPanel() {
+          historyPanel.style.display = "none";
+          btnHistory.setAttribute("aria-expanded", "false");
+        }
+
+        async function openHistoryPanel() {
+          closeReviewForm();
+          historyPanel.style.display = "block";
+          btnHistory.setAttribute("aria-expanded", "true");
+          historyBody.innerHTML = `<div class="loading-state"><div class="spinner"></div><span>Loading decision history...</span></div>`;
+
+          try {
+            const histUrl = `/api/projects/${state.activeProjectId}/requirements/${encodeURIComponent(state.activeRequirementId)}/decisions/history?target_id=${encodeURIComponent(cand.target_id)}`;
+            const events = await fetchJson(histUrl);
+
+            if (!events || events.length === 0) {
+              historyBody.innerHTML = `<p class="history-empty">No review decisions recorded for this candidate link yet.</p>`;
+              return;
+            }
+
+            historyBody.innerHTML = "";
+            const timeline = document.createElement("div");
+            timeline.className = "history-timeline";
+
+            const sortedEvents = [...events].sort((a, b) => b.revision_number - a.revision_number);
+
+            sortedEvents.forEach((ev) => {
+              const item = document.createElement("div");
+              item.className = "history-item";
+
+              const itemHeader = document.createElement("div");
+              itemHeader.className = "history-item-header";
+
+              const revBadge = document.createElement("span");
+              revBadge.className = "history-rev-tag";
+              revBadge.textContent = `Revision ${ev.revision_number}`;
+
+              const statusBadge = document.createElement("span");
+              if (ev.decision === "accepted") {
+                statusBadge.className = "badge-verification-status status-accepted";
+                statusBadge.textContent = "✓ Accepted";
+              } else if (ev.decision === "rejected") {
+                statusBadge.className = "badge-verification-status status-rejected";
+                statusBadge.textContent = "✗ Rejected";
+              } else {
+                statusBadge.className = "badge-verification-status status-needs-review";
+                statusBadge.textContent = "⏳ Needs Review";
+              }
+
+              const timeSpan = document.createElement("span");
+              timeSpan.className = "history-timestamp";
+              timeSpan.textContent = formatTimestamp(ev.created_at);
+
+              itemHeader.appendChild(revBadge);
+              itemHeader.appendChild(statusBadge);
+              itemHeader.appendChild(timeSpan);
+
+              const itemBody = document.createElement("div");
+              itemBody.className = "history-item-body";
+              if (ev.rationale && ev.rationale.trim()) {
+                itemBody.innerHTML = `<strong>Rationale:</strong> ${escapeHtml(ev.rationale)}`;
+              } else {
+                itemBody.innerHTML = `<em>No rationale recorded</em>`;
+              }
+
+              item.appendChild(itemHeader);
+              item.appendChild(itemBody);
+              timeline.appendChild(item);
+            });
+
+            historyBody.appendChild(timeline);
+          } catch (err) {
+            historyBody.innerHTML = `<div class="review-form-error" role="alert">Failed to load history: ${escapeHtml(err.message)}</div>`;
+          }
+        }
+
+        btnAccept.addEventListener("click", () => openReviewForm("accepted"));
+        btnReject.addEventListener("click", () => openReviewForm("rejected"));
+        btnNeedsReview.addEventListener("click", () => openReviewForm("needs_review"));
+        btnCancelDecision.addEventListener("click", closeReviewForm);
+
+        btnHistory.addEventListener("click", () => {
+          if (historyPanel.style.display === "block") {
+            closeHistoryPanel();
+          } else {
+            openHistoryPanel();
+          }
+        });
+
+        btnSaveDecision.addEventListener("click", async () => {
+          if (!currentDecisionAction) return;
+
+          const rationaleText = formTextarea.value.trim();
+          const isRequired = currentDecisionAction === "accepted" || currentDecisionAction === "rejected";
+
+          // Client-side validation: Rationale required for accept and reject
+          if (isRequired && !rationaleText) {
+            formError.textContent = `A non-empty rationale is required for ${currentDecisionAction} decisions.`;
+            formError.style.display = "block";
+            formTextarea.focus();
+            return;
+          }
+
+          formError.style.display = "none";
+
+          // In-flight submission lock: prevent duplicate clicks
+          btnSaveDecision.disabled = true;
+          btnSaveDecision.textContent = "Saving...";
+          btnCancelDecision.disabled = true;
+          btnAccept.disabled = true;
+          btnReject.disabled = true;
+          btnNeedsReview.disabled = true;
+          btnHistory.disabled = true;
+
+          try {
+            const postUrl = `/api/projects/${state.activeProjectId}/requirements/${encodeURIComponent(state.activeRequirementId)}/decisions`;
+            const payload = {
+              target_id: cand.target_id,
+              decision: currentDecisionAction,
+              rationale: rationaleText,
+            };
+
+            const res = await fetch(postUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+              throw new Error(data.error || `Server returned HTTP ${res.status}`);
+            }
+
+            // Confirmed update: update local candidate model
+            cand.developer_verification_status = data.decision;
+            cand.developer_verification_note = data.rationale;
+            cand.developer_verification_updated_at = data.updated_at;
+            cand.developer_verification_revision_count = data.revision_count;
+
+            // Update badge
+            if (data.decision === "accepted") {
+              verifBadge.className = "badge-verification-status status-accepted";
+              verifBadge.textContent = "✓ Accepted";
+            } else if (data.decision === "rejected") {
+              verifBadge.className = "badge-verification-status status-rejected";
+              verifBadge.textContent = "✗ Rejected";
+            } else if (data.decision === "needs_review") {
+              verifBadge.className = "badge-verification-status status-needs-review";
+              verifBadge.textContent = "⏳ Needs Review";
+            } else {
+              verifBadge.className = "badge-verification-status status-pending";
+              verifBadge.textContent = "⏳ Pending Review";
+            }
+
+            // Update confirmed banner
+            updateConfirmedBannerContent(
+              data.decision,
+              data.rationale,
+              data.updated_at,
+              data.revision_count
+            );
+
+            // Update history button text
+            btnHistory.innerHTML = `📜 History (${data.revision_count})`;
+
+            // Close form
+            closeReviewForm();
+          } catch (err) {
+            // Accessible error notification without optimistic UI update
+            formError.textContent = err.message || "Failed to save review decision.";
+            formError.style.display = "block";
+          } finally {
+            btnSaveDecision.disabled = false;
+            btnSaveDecision.textContent = "Save Decision";
+            btnCancelDecision.disabled = false;
+            btnAccept.disabled = false;
+            btnReject.disabled = false;
+            btnNeedsReview.disabled = false;
+            btnHistory.disabled = false;
+          }
+        });
+
+        card.appendChild(confirmedBanner);
+        card.appendChild(reviewActionBar);
+        card.appendChild(reviewFormPanel);
+        card.appendChild(historyPanel);
+      }
 
       // Code Preview Section: Collapsed by Default (Requirement 5)
       if (cand.code_preview) {
