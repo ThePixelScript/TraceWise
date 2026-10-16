@@ -627,6 +627,16 @@ def run_browser_verification() -> dict[str, Any]:
 
         # Step 12: Verify Developer Review Decision Workflow (Milestone B6.2)
         logger.info("[Step 12] Testing developer review decision workflow...")
+        client.eval_js("""(() => {
+            const m = document.getElementById('method-select');
+            m.value = 'b1_bm25';
+            m.dispatchEvent(new Event('change'));
+        })()""")
+        wait_until(
+            "document.querySelectorAll('.review-action-bar').length >= 5",
+            True,
+            timeout=10.0,
+        )
 
         # 12a: Verify review action buttons exist on candidate cards in developer mode
         action_bars_count = client.eval_js(
@@ -811,7 +821,206 @@ def run_browser_verification() -> dict[str, Any]:
             True,
         )
 
-        # 12g: Verify mode isolation: Switch back to Research/Evaluation mode
+        # 12g: Test Reject on candidate #2 with rationale validation
+        logger.info("Testing Reject decision with validation on candidate #2...")
+        client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="2"] '
+            ".btn-review-reject').click()"
+        )
+        wait_until(
+            'document.querySelector(\'.candidate-card[data-rank="2"] '
+            ".review-form-panel').style.display === 'flex'",
+            True,
+        )
+        # Empty rationale validation fails
+        client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="2"] '
+            ".btn-save-decision').click()"
+        )
+        time.sleep(0.2)
+        err_msg = client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="2"] '
+            ".review-form-error').textContent"
+        )
+        assert "rationale is required" in err_msg.lower(), (
+            f"Expected required rationale error on Reject, got: {err_msg}"
+        )
+        # Fill non-empty rationale and save
+        client.eval_js("""(() => {
+            const card = document.querySelector('.candidate-card[data-rank="2"]');
+            const ta = card.querySelector('.review-form-textarea');
+            ta.value = "Target code does not handle authentication logic.";
+            ta.dispatchEvent(new Event('input'));
+        })()""")
+        client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="2"] '
+            ".btn-save-decision').click()"
+        )
+        wait_until(
+            'document.querySelector(\'.candidate-card[data-rank="2"] '
+            ".review-form-panel').style.display === 'none'",
+            True,
+        )
+        badge2 = client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="2"] '
+            ".badge-verification-status').textContent"
+        )
+        assert "Rejected" in badge2, f"Expected Rejected badge, got {badge2}"
+
+        # 12h: Test Needs Review on candidate #3 with optional rationale
+        logger.info(
+            "Testing Needs Review decision (optional rationale) on candidate #3..."
+        )
+        client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="3"] '
+            ".btn-review-needs').click()"
+        )
+        wait_until(
+            'document.querySelector(\'.candidate-card[data-rank="3"] '
+            ".review-form-panel').style.display === 'flex'",
+            True,
+        )
+        # Save directly with empty rationale (allowed for needs_review)
+        client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="3"] '
+            ".btn-save-decision').click()"
+        )
+        wait_until(
+            'document.querySelector(\'.candidate-card[data-rank="3"] '
+            ".review-form-panel').style.display === 'none'",
+            True,
+        )
+        badge3 = client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="3"] '
+            ".badge-verification-status').textContent"
+        )
+        assert "Needs Review" in badge3, f"Expected Needs Review badge, got {badge3}"
+
+        # 12i: Test Revision: Revise candidate #1 decision (Accepted -> Rejected)
+        logger.info("Testing decision revision on candidate #1...")
+        client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".btn-review-reject').click()"
+        )
+        wait_until(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".review-form-panel').style.display === 'flex'",
+            True,
+        )
+        client.eval_js("""(() => {
+            const card = document.querySelector('.candidate-card[data-rank="1"]');
+            const ta = card.querySelector('.review-form-textarea');
+            ta.value = "Revised to rejected after security audit.";
+            ta.dispatchEvent(new Event('input'));
+        })()""")
+        client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".btn-save-decision').click()"
+        )
+        wait_until(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".review-form-panel').style.display === 'none'",
+            True,
+        )
+        rev_badge1 = client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".badge-verification-status').textContent"
+        )
+        assert "Rejected" in rev_badge1, (
+            f"Expected Revised Rejected badge, got {rev_badge1}"
+        )
+        rev_count_pill = client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".review-rev-pill').textContent"
+        )
+        assert "Revision 2" in rev_count_pill, (
+            f"Expected Revision 2, got {rev_count_pill}"
+        )
+
+        # Check history panel shows both revisions
+        client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".btn-review-history').click()"
+        )
+        wait_until(
+            'document.querySelectorAll(\'.candidate-card[data-rank="1"] '
+            ".history-item').length >= 2",
+            True,
+        )
+        hist_count = client.eval_js(
+            'document.querySelectorAll(\'.candidate-card[data-rank="1"] '
+            ".history-item').length"
+        )
+        assert hist_count == 2, f"Expected 2 history items, got {hist_count}"
+        client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".btn-review-history').click()"
+        )
+        wait_until(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".review-history-panel').style.display === 'none'",
+            True,
+        )
+
+        # 12j: Test Reload persistence: decisions reload from persistent store
+        logger.info("Testing decision persistence across full page reload...")
+        client.call("Page.reload")
+        time.sleep(1.5)
+        wait_until(
+            "document.querySelectorAll('#project-select option').length > 1",
+            True,
+            timeout=10.0,
+        )
+        # Switch mode to developer
+        client.eval_js("""(() => {
+            const sel = document.getElementById('mode-select');
+            sel.value = 'developer';
+            sel.dispatchEvent(new Event('change'));
+        })()""")
+        wait_until(
+            "document.getElementById('active-mode-label')"
+            ".textContent.includes('Developer Mode')",
+            True,
+        )
+        # Select REQ-002
+        client.eval_js("document.querySelectorAll('.req-item')[1].click()")
+        wait_until(
+            "document.getElementById('detail-req-id').textContent === 'REQ-002'", True
+        )
+        # Wait for candidate cards
+        wait_until("document.querySelectorAll('.candidate-card').length >= 3", True)
+        # Verify candidate 1 persisted as Rejected Revision 2
+        p_badge1 = wait_until(
+            "(() => {"
+            '  const b = document.querySelector(\'.candidate-card[data-rank="1"] '
+            "  .badge-verification-status');"
+            "  return b ? b.textContent : '';"
+            "})()",
+            expected="✗ Rejected",
+        )
+        assert "Rejected" in p_badge1, f"Expected Rejected after reload, got {p_badge1}"
+        p_badge2 = wait_until(
+            "(() => {"
+            '  const b = document.querySelector(\'.candidate-card[data-rank="2"] '
+            "  .badge-verification-status');"
+            "  return b ? b.textContent : '';"
+            "})()",
+            expected="✗ Rejected",
+        )
+        assert "Rejected" in p_badge2, f"Expected Rejected after reload, got {p_badge2}"
+        p_badge3 = wait_until(
+            "(() => {"
+            '  const b = document.querySelector(\'.candidate-card[data-rank="3"] '
+            "  .badge-verification-status');"
+            "  return b ? b.textContent : '';"
+            "})()",
+            expected="⏳ Needs Review",
+        )
+        assert "Needs Review" in p_badge3, (
+            f"Expected Needs Review after reload, got {p_badge3}"
+        )
+
+        # 12k: Verify mode isolation: Switch back to Research/Evaluation mode
         logger.info(
             "Testing mode isolation: review controls hidden in Research Mode..."
         )
