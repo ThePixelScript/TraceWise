@@ -248,3 +248,118 @@ class TestTraceWiseServiceCandidateRetrieval:
                 requirement_id="REQ-001",
                 mode="invalid_mode",
             )
+
+
+class TestCandidateEvidenceMetadata:
+    """Verifies ranking evidence and transparency metadata enrichment
+    (Milestone B6.3).
+    """
+
+    @pytest.fixture
+    def service(self) -> TraceWiseService:
+        return TraceWiseService()
+
+    def test_b0_tfidf_evidence_metadata(self, service: TraceWiseService) -> None:
+        res = service.get_candidates(
+            "sample_project", "REQ-001", method="b0_tfidf", top_k=3
+        )
+        cand = res["candidates"][0]
+        meta = cand["metadata"]
+        assert meta["retrieval_method"] == "b0_tfidf"
+        assert "Cosine Similarity" in meta["similarity_metric"]
+        assert isinstance(meta["matched_terms"], list)
+        assert meta["matched_terms_count"] == len(meta["matched_terms"])
+        assert meta["query_terms_count"] > 0
+        assert meta["target_token_count"] > 0
+        assert "is_gold_link" not in meta
+
+    def test_b1_bm25_evidence_metadata(self, service: TraceWiseService) -> None:
+        res = service.get_candidates(
+            "sample_project", "REQ-001", method="b1_bm25", top_k=3
+        )
+        cand = res["candidates"][0]
+        meta = cand["metadata"]
+        assert meta["retrieval_method"] == "b1_bm25"
+        assert meta["bm25_k1"] == 1.5
+        assert meta["bm25_b"] == 0.75
+        assert isinstance(meta["matched_terms"], list)
+        assert meta["matched_terms_count"] > 0
+        assert meta["target_token_count"] > 0
+        assert "is_gold_link" not in meta
+
+    def test_b2_semantic_evidence_metadata(self, service: TraceWiseService) -> None:
+        res = service.get_candidates(
+            "sample_project", "REQ-001", method="b2_semantic", top_k=3
+        )
+        cand = res["candidates"][0]
+        meta = cand["metadata"]
+        assert meta["retrieval_method"] == "b2_semantic"
+        assert "bge-small-en-v1.5" in meta["embedding_model"]
+        assert meta["similarity_metric"] == "Dense Cosine Similarity"
+        assert meta["vector_dimension"] == 384
+        assert "is_gold_link" not in meta
+
+    def test_b3_structural_evidence_metadata(self, service: TraceWiseService) -> None:
+        res = service.get_candidates(
+            "sample_project", "REQ-001", method="b3_structural", top_k=3
+        )
+        cand = res["candidates"][0]
+        meta = cand["metadata"]
+        assert meta["retrieval_method"] == "b3_structural"
+        assert meta["alpha"] == 0.5
+        assert "seed_score" in meta
+        assert "graph_score" in meta
+        assert "degree" in meta
+        assert isinstance(meta["seed_score"], float)
+        assert isinstance(meta["graph_score"], float)
+        assert isinstance(meta["degree"], int)
+        assert "is_gold_link" not in meta
+
+    def test_b4_hybrid_evidence_metadata(self, service: TraceWiseService) -> None:
+        res = service.get_candidates(
+            "sample_project", "REQ-001", method="b4_hybrid", top_k=3
+        )
+        cand = res["candidates"][0]
+        meta = cand["metadata"]
+        assert meta["retrieval_method"] == "b4_hybrid"
+        assert meta["rrf_k"] == 60
+        assert "component_ranks" in meta
+        assert "component_contributions" in meta
+        assert "tfidf" in meta["component_contributions"]
+        assert "semantic" in meta["component_contributions"]
+        assert "structural" in meta["component_contributions"]
+        assert "is_gold_link" not in meta
+
+    def test_b5_llm_rerank_evidence_metadata(self, service: TraceWiseService) -> None:
+        res = service.get_candidates(
+            "sample_project", "REQ-001", method="b5_llm_rerank", top_k=3
+        )
+        cand = res["candidates"][0]
+        meta = cand["metadata"]
+        assert meta["retrieval_method"] == "b5_llm_rerank"
+        assert "bm25_score" in meta
+        assert "bm25_rank" in meta
+        assert "llm_score" in meta
+        assert "b5_fallback" in meta
+        assert "qwen3.5:9b" in meta["reranker_model"]
+        assert "is_gold_link" not in meta
+
+    def test_evidence_metadata_blinded_in_developer_mode(
+        self, service: TraceWiseService
+    ) -> None:
+        methods = [
+            "b0_tfidf",
+            "b1_bm25",
+            "b2_semantic",
+            "b3_structural",
+            "b4_hybrid",
+            "b5_llm_rerank",
+        ]
+        for m in methods:
+            res = service.get_candidates(
+                "sample_project", "REQ-001", method=m, top_k=3, mode="developer"
+            )
+            for cand in res["candidates"]:
+                assert cand["is_gold_link"] is None
+                assert "is_gold_link" not in cand["metadata"]
+                assert "gold_links" not in cand["metadata"]

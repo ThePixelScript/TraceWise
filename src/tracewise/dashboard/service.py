@@ -589,6 +589,91 @@ class TraceWiseService:
                 verif_updated_at = None
                 verif_rev_count = 0
 
+            # Enrich candidate metadata with evidence and transparency fields
+            cand_meta = dict(cand.get("metadata", {}))
+            retriever_name = cand.get("retriever_name", method)
+
+            if retriever_name in ("b1_bm25", "bm25"):
+                cand_meta.setdefault("retrieval_method", "b1_bm25")
+                cand_meta.setdefault("bm25_k1", 1.5)
+                cand_meta.setdefault("bm25_b", 0.75)
+                if source_artifact and req:
+                    q_toks = {t.lower() for t in req.tokens}
+                    doc_toks = {t.lower() for t in source_artifact.tokens}
+                    matched = sorted(list(q_toks & doc_toks))
+                    cand_meta["matched_terms"] = matched
+                    cand_meta["matched_terms_count"] = len(matched)
+                    cand_meta["query_terms_count"] = len(q_toks)
+                    cand_meta["target_token_count"] = len(source_artifact.tokens)
+                else:
+                    cand_meta.setdefault("matched_terms", [])
+                    cand_meta.setdefault("matched_terms_count", 0)
+                    cand_meta.setdefault(
+                        "query_terms_count", len(req.tokens) if req else 0
+                    )
+                    cand_meta.setdefault("target_token_count", 0)
+
+            elif retriever_name in ("b0_tfidf", "tfidf_cosine"):
+                cand_meta.setdefault("retrieval_method", "b0_tfidf")
+                cand_meta.setdefault(
+                    "similarity_metric",
+                    "Cosine Similarity (Sublinear TF + Smoothed IDF)",
+                )
+                if source_artifact and req:
+                    q_toks = {t.lower() for t in req.tokens}
+                    doc_toks = {t.lower() for t in source_artifact.tokens}
+                    matched = sorted(list(q_toks & doc_toks))
+                    cand_meta["matched_terms"] = matched
+                    cand_meta["matched_terms_count"] = len(matched)
+                    cand_meta["query_terms_count"] = len(q_toks)
+                    cand_meta["target_token_count"] = len(source_artifact.tokens)
+                else:
+                    cand_meta.setdefault("matched_terms", [])
+                    cand_meta.setdefault("matched_terms_count", 0)
+                    cand_meta.setdefault(
+                        "query_terms_count", len(req.tokens) if req else 0
+                    )
+                    cand_meta.setdefault("target_token_count", 0)
+
+            elif retriever_name in ("b2_semantic", "semantic"):
+                cand_meta.setdefault("retrieval_method", "b2_semantic")
+                cand_meta.setdefault("embedding_model", "BAAI/bge-small-en-v1.5")
+                cand_meta.setdefault("similarity_metric", "Dense Cosine Similarity")
+                cand_meta.setdefault("vector_dimension", 384)
+
+            elif retriever_name in ("b3_structural", "structural"):
+                cand_meta.setdefault("retrieval_method", "b3_structural")
+                cand_meta.setdefault("alpha", 0.5)
+                if source_artifact:
+                    cand_meta.setdefault(
+                        "entity_name", source_artifact.metadata.get("name")
+                    )
+                    cand_meta.setdefault(
+                        "parent_entity", source_artifact.metadata.get("parent_id")
+                    )
+                    cand_meta.setdefault(
+                        "chunk_type", source_artifact.metadata.get("chunk_type")
+                    )
+
+            elif retriever_name in ("b4_hybrid", "hybrid"):
+                cand_meta.setdefault("retrieval_method", "b4_hybrid")
+                k_val = cand_meta.get("rrf_k", 60)
+                cand_meta.setdefault("rrf_k", k_val)
+                comp_ranks = cand_meta.get("component_ranks", {})
+                comp_contributions = {}
+                for comp_name, r in comp_ranks.items():
+                    if r is not None and isinstance(r, int) and r > 0:
+                        comp_contributions[comp_name] = round(1.0 / (k_val + r), 6)
+                    else:
+                        comp_contributions[comp_name] = 0.0
+                cand_meta["component_contributions"] = comp_contributions
+
+            elif retriever_name in ("b5_llm_rerank",):
+                cand_meta.setdefault("retrieval_method", "b5_llm_rerank")
+                cand_meta.setdefault("candidate_generator", "B1 BM25 (Pool k=20)")
+                cand_meta.setdefault("reranker_model", "qwen3.5:9b")
+                cand_meta.setdefault("score_scale", "0-3")
+
             enriched_candidates.append(
                 {
                     "rank": cand["rank"],
@@ -606,7 +691,7 @@ class TraceWiseService:
                     "code_preview": code_text,
                     "code_lines": len(code_text.splitlines()) if code_text else 0,
                     "code_chars": len(code_text),
-                    "metadata": cand.get("metadata", {}),
+                    "metadata": cand_meta,
                 }
             )
 

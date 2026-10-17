@@ -313,10 +313,10 @@
       document.querySelectorAll(".badge-gold-match").forEach((el) => el.remove());
       document.querySelectorAll(".badge-unlinked").forEach((el) => el.remove());
     } else {
-      // In Research/Evaluation mode, remove any developer review controls
+      // In Research/Evaluation mode, remove any developer review controls and evidence panels
       document
         .querySelectorAll(
-          ".review-action-bar, .review-form-panel, .review-history-panel, .review-confirmed-banner"
+          ".review-action-bar, .review-form-panel, .review-history-panel, .review-confirmed-banner, .candidate-evidence-section"
         )
         .forEach((el) => el.remove());
     }
@@ -692,6 +692,325 @@
     }
   }
 
+  function createEvidenceItem(label, value, isCode = false) {
+    const div = document.createElement("div");
+    div.className = "evidence-item";
+    const lbl = document.createElement("span");
+    lbl.className = "evidence-label";
+    lbl.textContent = label;
+    const val = document.createElement("span");
+    val.className = "evidence-value";
+    if (isCode) {
+      val.innerHTML = `<code>${escapeHtml(String(value))}</code>`;
+    } else {
+      val.textContent = String(value);
+    }
+    div.appendChild(lbl);
+    div.appendChild(val);
+    return div;
+  }
+
+  function createEvidenceTermsItem(label, terms) {
+    const div = document.createElement("div");
+    div.className = "evidence-item evidence-item-full";
+    const lbl = document.createElement("span");
+    lbl.className = "evidence-label";
+    lbl.textContent = label;
+    div.appendChild(lbl);
+
+    const val = document.createElement("div");
+    val.className = "evidence-terms-container";
+
+    if (terms && Array.isArray(terms) && terms.length > 0) {
+      terms.forEach((t) => {
+        const chip = document.createElement("span");
+        chip.className = "evidence-term-chip";
+        chip.textContent = t;
+        val.appendChild(chip);
+      });
+    } else {
+      const empty = document.createElement("span");
+      empty.className = "evidence-text-muted";
+      empty.textContent = "None (no direct vocabulary overlap)";
+      val.appendChild(empty);
+    }
+
+    div.appendChild(val);
+    return div;
+  }
+
+  function createEvidenceNote(noteText) {
+    const note = document.createElement("div");
+    note.className = "evidence-note";
+    note.innerHTML = `<em>Note:</em> ${escapeHtml(noteText)}`;
+    return note;
+  }
+
+  function renderEvidenceContent(cand, container) {
+    container.innerHTML = "";
+    const meta = cand.metadata || {};
+    const method = (meta.retrieval_method || cand.retriever_name || state.activeMethodId || "").toLowerCase();
+
+    const cardBox = document.createElement("div");
+    cardBox.className = "evidence-content-box";
+
+    const headerRow = document.createElement("div");
+    headerRow.className = "evidence-header-row";
+
+    const badge = document.createElement("span");
+    badge.className = "evidence-method-badge";
+
+    const summaryText = document.createElement("span");
+    summaryText.className = "evidence-summary-text";
+
+    const grid = document.createElement("div");
+    grid.className = "evidence-details-grid";
+
+    const isB0 = method.includes("b0") || method.includes("tfidf");
+    const isB1 = method.includes("b1") || method === "bm25";
+    const isB2 = method.includes("b2") || method === "semantic";
+    const isB3 = method.includes("b3") || method === "structural";
+    const isB4 = method.includes("b4") || method === "hybrid";
+    const isB5 = method.includes("b5") || method.includes("rerank");
+
+    if (isB0) {
+      badge.textContent = "B0: TF-IDF (Lexical)";
+      const sc = typeof cand.score === "number" ? cand.score.toFixed(4) : cand.score;
+      summaryText.textContent = `Cosine Similarity: ${sc}`;
+
+      const item1 = createEvidenceItem(
+        "Similarity Metric",
+        meta.similarity_metric || "Cosine Similarity (Sublinear TF + Smoothed IDF)"
+      );
+      const matchedCount = meta.matched_terms_count ?? (meta.matched_terms ? meta.matched_terms.length : 0);
+      const queryCount = meta.query_terms_count ?? "N/A";
+      const item2 = createEvidenceItem(
+        "Vocabulary Match",
+        `${matchedCount} overlapping term(s) (out of ${queryCount} query terms)`
+      );
+      grid.appendChild(item1);
+      grid.appendChild(item2);
+
+      const itemTerms = createEvidenceTermsItem("Overlapping Terms", meta.matched_terms);
+      grid.appendChild(itemTerms);
+
+      const note = createEvidenceNote(
+        "Scores reflect vector space model dot products of L2-normalized TF-IDF vectors. Matched terms indicate literal token occurrences shared between requirement and code."
+      );
+      cardBox.appendChild(headerRow);
+      cardBox.appendChild(grid);
+      cardBox.appendChild(note);
+
+    } else if (isB1) {
+      badge.textContent = "B1: BM25 (Lexical)";
+      const sc = typeof cand.score === "number" ? cand.score.toFixed(3) : cand.score;
+      summaryText.textContent = `Okapi BM25 Score: ${sc}`;
+
+      const item1 = createEvidenceItem(
+        "Ranking Parameters",
+        `k1 = ${meta.bm25_k1 ?? "1.5"}, b = ${meta.bm25_b ?? "0.75"} (un-tuned Okapi standard)`
+      );
+      const matchedCount = meta.matched_terms_count ?? (meta.matched_terms ? meta.matched_terms.length : 0);
+      const queryCount = meta.query_terms_count ?? "N/A";
+      const item2 = createEvidenceItem(
+        "Term Matches",
+        `${matchedCount} overlapping term(s) (out of ${queryCount} query terms)`
+      );
+      const docLen = meta.target_token_count ?? "N/A";
+      const item3 = createEvidenceItem("Document Length", `${docLen} tokens`);
+
+      grid.appendChild(item1);
+      grid.appendChild(item2);
+      grid.appendChild(item3);
+
+      const itemTerms = createEvidenceTermsItem("Overlapping Terms", meta.matched_terms);
+      grid.appendChild(itemTerms);
+
+      const note = createEvidenceNote(
+        "Okapi BM25 weights term frequency with asymptotic saturation and document-length normalization. Terms shown above represent direct lexical matches."
+      );
+      cardBox.appendChild(headerRow);
+      cardBox.appendChild(grid);
+      cardBox.appendChild(note);
+
+    } else if (isB2) {
+      badge.textContent = "B2: Dense Semantic";
+      const sc = typeof cand.score === "number" ? cand.score.toFixed(4) : cand.score;
+      summaryText.textContent = `Cosine Similarity: ${sc}`;
+
+      const item1 = createEvidenceItem(
+        "Embedding Backend",
+        meta.model_name || meta.embedding_model || "BAAI/bge-small-en-v1.5"
+      );
+      const item2 = createEvidenceItem(
+        "Vector Metric",
+        meta.similarity_metric || "Cosine similarity of L2-normalized embeddings"
+      );
+      const item3 = createEvidenceItem(
+        "Representation Space",
+        `${meta.vector_dimension || 384}-dimensional dense embedding space`
+      );
+      grid.appendChild(item1);
+      grid.appendChild(item2);
+      grid.appendChild(item3);
+
+      const note = createEvidenceNote(
+        "Dense retrieval scores conceptual semantic relatedness in embedding space. Individual word-level attribution is not available under this bi-encoder architecture."
+      );
+      cardBox.appendChild(headerRow);
+      cardBox.appendChild(grid);
+      cardBox.appendChild(note);
+
+    } else if (isB3) {
+      badge.textContent = "B3: Structural";
+      const sc = typeof cand.score === "number" ? cand.score.toFixed(4) : cand.score;
+      summaryText.textContent = `Composite Structural Score: ${sc}`;
+
+      const seedStr = typeof meta.seed_score === "number" ? meta.seed_score.toFixed(4) : (meta.seed_score ?? "N/A");
+      const graphStr = typeof meta.graph_score === "number" ? meta.graph_score.toFixed(4) : (meta.graph_score ?? "N/A");
+      const degStr = meta.degree !== undefined ? `${meta.degree} neighbors` : "N/A";
+
+      const item1 = createEvidenceItem(
+        "Direct Seed Score",
+        `${seedStr} (50% weight: identifier token overlap)`
+      );
+      const item2 = createEvidenceItem(
+        "Graph Propagation Score",
+        `${graphStr} (50% weight: 1-hop normalized diffusion)`
+      );
+      const item3 = createEvidenceItem("Graph Degree / Connectivity", degStr);
+
+      grid.appendChild(item1);
+      grid.appendChild(item2);
+      grid.appendChild(item3);
+
+      if (meta.entity_name) {
+        const item4 = createEvidenceItem("Declared Symbol Name", meta.entity_name, true);
+        grid.appendChild(item4);
+      }
+      if (meta.parent_entity) {
+        const item5 = createEvidenceItem("Enclosing Entity", meta.parent_entity, true);
+        grid.appendChild(item5);
+      }
+      if (meta.chunk_type) {
+        const item6 = createEvidenceItem("Code Unit Type", meta.chunk_type);
+        grid.appendChild(item6);
+      }
+
+      const note = createEvidenceNote(
+        "Composite score: S = (1 - α) × S_seed + α × S_graph with fixed α = 0.5. Dependencies are inferred from code hierarchy and textual symbol references."
+      );
+      cardBox.appendChild(headerRow);
+      cardBox.appendChild(grid);
+      cardBox.appendChild(note);
+
+    } else if (isB4) {
+      badge.textContent = "B4: Hybrid RRF";
+      const sc = typeof cand.score === "number" ? cand.score.toFixed(6) : cand.score;
+      summaryText.textContent = `Fused RRF Score: ${sc}`;
+
+      const rrfK = meta.rrf_k ?? 60;
+      const compRanks = meta.component_ranks || {};
+      const compContribs = meta.component_contributions || {};
+
+      function formatComp(rank, contrib) {
+        if (rank !== null && rank !== undefined) {
+          const cStr = typeof contrib === "number" ? contrib.toFixed(6) : contrib;
+          return `Rank #${rank} (contribution: +${cStr})`;
+        }
+        return "Unranked in component (contribution: 0.000000)";
+      }
+
+      const item1 = createEvidenceItem(
+        "B0 TF-IDF Contribution",
+        formatComp(compRanks.tfidf, compContribs.tfidf)
+      );
+      const item2 = createEvidenceItem(
+        "B2 Dense Semantic Contribution",
+        formatComp(compRanks.semantic, compContribs.semantic)
+      );
+      const item3 = createEvidenceItem(
+        "B3 Structural Contribution",
+        formatComp(compRanks.structural, compContribs.structural)
+      );
+      const item4 = createEvidenceItem(
+        "Fusion Formula",
+        `RRF = sum(1 / (${rrfK} + rank_i)) across ranked baselines`
+      );
+
+      grid.appendChild(item1);
+      grid.appendChild(item2);
+      grid.appendChild(item3);
+      grid.appendChild(item4);
+
+      const note = createEvidenceNote(
+        "Reciprocal Rank Fusion unifies diverse retrieval mechanisms. Underlying raw component scores are not preserved in rank-based fusion."
+      );
+      cardBox.appendChild(headerRow);
+      cardBox.appendChild(grid);
+      cardBox.appendChild(note);
+
+    } else if (isB5) {
+      badge.textContent = "B5: LLM Reranking";
+      const sc = typeof cand.score === "number" ? cand.score.toFixed(1) : cand.score;
+      summaryText.textContent = `LLM Relevance Rating: ${sc} / 3`;
+
+      const ratingMeaning = {
+        0: "0: Irrelevant (no discernible connection)",
+        1: "1: Weakly Related (minor tangential connection)",
+        2: "2: Partially Related (context / helper logic)",
+        3: "3: Core Implementation (directly implements requirement)"
+      };
+
+      const rawLlm = meta.llm_score;
+      const llmDesc = rawLlm !== undefined && rawLlm !== null
+        ? (ratingMeaning[rawLlm] || `${rawLlm} / 3`)
+        : "N/A (model score not recorded)";
+
+      const item1 = createEvidenceItem("LLM Relevance Rating", llmDesc);
+      const bm25RankStr = meta.bm25_rank !== undefined ? `#${meta.bm25_rank}` : "N/A";
+      const bm25ScoreStr = typeof meta.bm25_score === "number" ? meta.bm25_score.toFixed(3) : (meta.bm25_score ?? "N/A");
+      const item2 = createEvidenceItem(
+        "Initial BM25 Rank & Score",
+        `Rank ${bm25RankStr} (BM25 score: ${bm25ScoreStr})`
+      );
+
+      const isFallback = meta.b5_fallback === true;
+      const item3 = createEvidenceItem(
+        "Execution Mode",
+        isFallback ? "Fallback (BM25 ordering preserved)" : "Standard LLM reranking (genuine score)"
+      );
+      const item4 = createEvidenceItem(
+        "Pipeline Configuration",
+        `Frozen B1 candidate generator (top 20) → ${meta.reranker_model || "qwen3.5:9b"} (temp=0)`
+      );
+
+      grid.appendChild(item1);
+      grid.appendChild(item2);
+      grid.appendChild(item3);
+      grid.appendChild(item4);
+
+      const note = createEvidenceNote(
+        "Reranking sorts by LLM score descending, breaking ties with original BM25 rank ascending. Step-by-step reasoning tokens were disabled during zero-shot JSON scoring."
+      );
+      cardBox.appendChild(headerRow);
+      cardBox.appendChild(grid);
+      cardBox.appendChild(note);
+
+    } else {
+      badge.textContent = method || "Retrieval Method";
+      summaryText.textContent = `Score: ${cand.score}`;
+      const item1 = createEvidenceItem("Retriever", cand.retriever_name || method);
+      grid.appendChild(item1);
+      cardBox.appendChild(headerRow);
+      cardBox.appendChild(grid);
+    }
+
+    headerRow.appendChild(badge);
+    headerRow.appendChild(summaryText);
+    container.appendChild(cardBox);
+  }
+
   function renderCandidatesList(candidates) {
     if (!elements.candidatesList) return;
     elements.candidatesList.innerHTML = "";
@@ -850,6 +1169,42 @@
 
       // Developer Review Workflow Components (Visible ONLY in Developer Workflow Mode)
       if (isDev) {
+        // 0. Collapsible Ranking Evidence Section (Milestone B6.3)
+        const evidenceSection = document.createElement("div");
+        evidenceSection.className = "candidate-evidence-section";
+
+        const btnToggleEvidence = document.createElement("button");
+        btnToggleEvidence.type = "button";
+        btnToggleEvidence.className = "btn-toggle-evidence";
+        btnToggleEvidence.setAttribute("aria-expanded", "false");
+        btnToggleEvidence.setAttribute("aria-controls", `evidence-panel-${cand.rank}`);
+        btnToggleEvidence.innerHTML = `<span>🔎 View Ranking Evidence ▾</span>`;
+
+        const evidencePanel = document.createElement("div");
+        evidencePanel.id = `evidence-panel-${cand.rank}`;
+        evidencePanel.className = "candidate-evidence-panel";
+        evidencePanel.style.display = "none";
+        evidencePanel.setAttribute("role", "region");
+        evidencePanel.setAttribute("aria-label", `Ranking evidence for candidate ${cand.target_id}`);
+
+        renderEvidenceContent(cand, evidencePanel);
+
+        btnToggleEvidence.addEventListener("click", () => {
+          const isHidden = evidencePanel.style.display === "none";
+          evidencePanel.style.display = isHidden ? "block" : "none";
+          btnToggleEvidence.setAttribute("aria-expanded", isHidden ? "true" : "false");
+          const span = btnToggleEvidence.querySelector("span");
+          if (span) {
+            span.textContent = isHidden
+              ? "🔎 Hide Ranking Evidence ▴"
+              : "🔎 View Ranking Evidence ▾";
+          }
+        });
+
+        evidenceSection.appendChild(btnToggleEvidence);
+        evidenceSection.appendChild(evidencePanel);
+        card.appendChild(evidenceSection);
+
         // 1. Confirmed Review Decision Banner
         const confirmedBanner = document.createElement("div");
         confirmedBanner.className = "review-confirmed-banner";

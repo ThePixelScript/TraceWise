@@ -647,6 +647,60 @@ def run_browser_verification() -> dict[str, Any]:
             f"got {action_bars_count}"
         )
 
+        # 12a2: Verify Candidate Ranking Evidence (Milestone B6.3)
+        logger.info("Testing candidate ranking evidence panel (Milestone B6.3)...")
+        evidence_btns_count = client.eval_js(
+            "document.querySelectorAll('.btn-toggle-evidence').length"
+        )
+        assert evidence_btns_count >= 5, (
+            f"Expected candidate evidence toggle buttons in developer mode, "
+            f"got {evidence_btns_count}"
+        )
+
+        # Verify evidence panel is collapsed initially
+        ev_init_hidden = client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".candidate-evidence-panel').style.display === 'none'"
+        )
+        assert ev_init_hidden, "Evidence panel must be collapsed initially"
+
+        # Click to expand evidence panel on candidate #1
+        client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".btn-toggle-evidence').click()"
+        )
+        wait_until(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".candidate-evidence-panel').style.display === 'block'",
+            True,
+        )
+
+        ev_badge = client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".evidence-method-badge').textContent"
+        )
+        assert "BM25" in ev_badge, f"Expected BM25 in evidence badge, got {ev_badge}"
+
+        ev_summary = client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".evidence-summary-text').textContent"
+        )
+        assert "BM25 Score" in ev_summary, (
+            f"Expected BM25 Score in evidence summary, got {ev_summary}"
+        )
+
+        # Click to collapse evidence panel on candidate #1
+        client.eval_js(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".btn-toggle-evidence').click()"
+        )
+        wait_until(
+            'document.querySelector(\'.candidate-card[data-rank="1"] '
+            ".candidate-evidence-panel').style.display === 'none'",
+            True,
+        )
+        logger.info("Candidate ranking evidence expand/collapse verified.")
+
         # 12b: Click Accept on candidate #1 to open inline review form
         client.eval_js(
             'document.querySelector(\'.candidate-card[data-rank="1"] '
@@ -1041,6 +1095,13 @@ def run_browser_verification() -> dict[str, Any]:
         )
         assert eval_action_bars == 0, (
             f"Expected 0 review action bars in Research Mode, got {eval_action_bars}"
+        )
+
+        eval_evidence_btns = client.eval_js(
+            "document.querySelectorAll('.btn-toggle-evidence').length"
+        )
+        assert eval_evidence_btns == 0, (
+            f"Expected 0 evidence buttons in Research Mode, got {eval_evidence_btns}"
         )
 
         # Verify benchmark ground truth section restored in Evaluation Mode

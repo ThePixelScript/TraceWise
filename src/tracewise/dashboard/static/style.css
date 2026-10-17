@@ -1287,6 +1287,165 @@ body {
   color: var(--text-secondary);
 }
 
+/* ==========================================================================
+   Candidate Ranking Evidence and Transparency (Milestone B6.3)
+   ========================================================================== */
+
+.candidate-evidence-section {
+  margin-top: 0.65rem;
+}
+
+.btn-toggle-evidence {
+  background: none;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-subtle);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.775rem;
+  font-weight: 500;
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.15s ease;
+}
+
+.btn-toggle-evidence:hover {
+  background-color: var(--bg-muted);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+
+.btn-toggle-evidence[aria-expanded="true"] {
+  background-color: var(--primary-surface);
+  color: var(--primary);
+  border-color: var(--primary-border);
+}
+
+.candidate-evidence-panel {
+  margin-top: 0.65rem;
+  padding: 0.85rem;
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.evidence-content-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.evidence-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem;
+}
+
+.evidence-method-badge {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  background-color: var(--primary-surface);
+  color: var(--primary);
+  border: 1px solid var(--primary-border);
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-sm);
+}
+
+.evidence-summary-text {
+  font-family: var(--font-mono);
+  font-size: 0.775rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.evidence-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.5rem;
+}
+
+.evidence-item {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.evidence-item-full {
+  grid-column: 1 / -1;
+}
+
+.evidence-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.evidence-value {
+  font-size: 0.785rem;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.evidence-value code {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--primary);
+  background-color: var(--bg-subtle);
+  padding: 0.1rem 0.3rem;
+  border-radius: var(--radius-sm);
+}
+
+.evidence-terms-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.2rem;
+}
+
+.evidence-term-chip {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  background-color: var(--bg-subtle);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--radius-sm);
+}
+
+.evidence-text-muted {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.evidence-note {
+  font-size: 0.725rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  border-top: 1px dashed var(--border-color);
+  padding-top: 0.45rem;
+  margin-top: 0.2rem;
+}
+
+.evidence-note em {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-style: normal;
+}
+
 /* Progressive Disclosure: Reveal More Candidates Button */
 .reveal-container {
   display: flex;
