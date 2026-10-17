@@ -145,6 +145,25 @@
     setupEventListeners();
 
     try {
+      try {
+        const health = await fetchJson("/api/health");
+        if (health && health.developer_only) {
+          state.developerOnly = true;
+          state.mode = "developer";
+          if (elements.modeSelect) {
+            elements.modeSelect.value = "developer";
+            elements.modeSelect.disabled = true;
+            elements.modeSelect.title =
+              "Developer Workflow Mode enforced by server configuration";
+            elements.modeSelect.innerHTML =
+              '<option value="developer" selected>Developer Workflow Mode (Enforced by Server)</option>';
+          }
+          updateModeDisplay();
+        }
+      } catch (e) {
+        // Continue if health check fails or is not ready
+      }
+
       await loadRetrievalMethods();
       await loadProjects();
     } catch (err) {
@@ -160,6 +179,11 @@
     // Mode Selector change (Evaluation vs Developer Workflow)
     if (elements.modeSelect) {
       elements.modeSelect.addEventListener("change", (e) => {
+        if (state.developerOnly) {
+          elements.modeSelect.value = "developer";
+          state.mode = "developer";
+          return;
+        }
         hideError();
         state.mode = e.target.value;
         updateModeDisplay();
@@ -279,9 +303,13 @@
     const isDev = state.mode === "developer";
 
     if (elements.activeModeLabel) {
-      elements.activeModeLabel.textContent = isDev
-        ? "💼 Developer Mode (Blinded)"
-        : "🔬 Research Mode";
+      if (state.developerOnly) {
+        elements.activeModeLabel.textContent = "💼 Developer Mode (Server Enforced)";
+      } else {
+        elements.activeModeLabel.textContent = isDev
+          ? "💼 Developer Mode (Blinded)"
+          : "🔬 Research Mode";
+      }
     }
 
     // In developer mode, strictly blind filter tabs because ground truth is isolated
@@ -840,7 +868,7 @@
 
       const item1 = createEvidenceItem(
         "Embedding Backend",
-        meta.model_name || meta.embedding_model || "BAAI/bge-small-en-v1.5"
+        meta.model_name || meta.embedding_model || "sentence-transformers/all-MiniLM-L6-v2"
       );
       const item2 = createEvidenceItem(
         "Vector Metric",

@@ -38,6 +38,14 @@ def main() -> None:
         help="Do not automatically open the dashboard in default browser",
     )
     parser.add_argument(
+        "--developer-only",
+        action="store_true",
+        help=(
+            "Enforce developer-only workflow mode (strictly blinds "
+            "benchmark ground truth on server)"
+        ),
+    )
+    parser.add_argument(
         "--verbose",
         "-v",
         action="store_true",
@@ -51,11 +59,12 @@ def main() -> None:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    service = TraceWiseService()
+    service = TraceWiseService(developer_only=args.developer_only)
     server = TraceWiseDashboardServer(
         host=args.host,
         port=args.port,
         service=service,
+        developer_only=args.developer_only,
     )
 
     print("=" * 64)
@@ -64,6 +73,10 @@ def main() -> None:
     print("  Supported datasets:  sample_project, iTrust, eTour")
     print("  Retrieval models:    B0 (TF-IDF), B1 (BM25), B2 (Semantic),")
     print("                       B3 (Structural), B4 (Hybrid RRF), B5 (LLM Rerank)")
+    if args.developer_only:
+        print("  Operating mode:      DEVELOPER-ONLY (Ground-truth blinding enforced)")
+    else:
+        print("  Operating mode:      Standard (Research & Developer modes available)")
     print("  Press Ctrl+C to terminate.")
     print("=" * 64)
 

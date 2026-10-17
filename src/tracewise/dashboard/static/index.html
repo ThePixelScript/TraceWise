@@ -45,9 +45,9 @@
         <select id="method-select" class="form-select" aria-label="Select retrieval baseline algorithm">
           <option value="b1_bm25" selected>B1 BM25 (Lexical, k1=1.5, b=0.75)</option>
           <option value="b0_tfidf">B0 TF-IDF (Vector Space Model)</option>
-          <option value="b2_semantic">B2 Dense Semantic (BGE Embeddings)</option>
+          <option value="b2_semantic">B2 Dense Semantic (all-MiniLM-L6-v2)</option>
           <option value="b3_structural">B3 Structural (AST + Lexical)</option>
-          <option value="b4_hybrid">B4 Hybrid Fusion (BM25 + Semantic)</option>
+          <option value="b4_hybrid">B4 Hybrid Fusion (B0 + B2 + B3 RRF)</option>
           <option value="b5_llm_rerank">B5 LLM Reranking (BM25 + qwen3.5:9b)</option>
         </select>
       </div>

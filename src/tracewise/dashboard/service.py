@@ -56,10 +56,10 @@ RETRIEVAL_METHODS_CATALOG: list[dict[str, Any]] = [
     {
         "id": "b2_semantic",
         "name": "B2: Dense Semantic",
-        "description": "Dense vector retrieval using fastembed (bge-small-en-v1.5)",
+        "description": "Dense vector retrieval using fastembed (all-MiniLM-L6-v2)",
         "family": "Dense Semantic",
         "baseline_code": "B2",
-        "parameters": {"model": "BAAI/bge-small-en-v1.5"},
+        "parameters": {"model": "sentence-transformers/all-MiniLM-L6-v2"},
     },
     {
         "id": "b3_structural",
@@ -72,10 +72,16 @@ RETRIEVAL_METHODS_CATALOG: list[dict[str, Any]] = [
     {
         "id": "b4_hybrid",
         "name": "B4: Hybrid RRF",
-        "description": "Reciprocal Rank Fusion uniting BM25 and dense semantic search",
+        "description": (
+            "Unweighted Reciprocal Rank Fusion (k=60) over B0 TF-IDF, "
+            "B2 Semantic, and B3 Structural retrieval"
+        ),
         "family": "Hybrid",
         "baseline_code": "B4",
-        "parameters": {"rrf_k": 60},
+        "parameters": {
+            "rrf_k": 60,
+            "components": ["b0_tfidf", "b2_semantic", "b3_structural"],
+        },
     },
     {
         "id": "b5_llm_rerank",
@@ -138,13 +144,17 @@ class TraceWiseService:
         manifest_paths: dict[str, Path | str] | None = None,
         checkpoint_dir: Path | str | None = None,
         review_store: ReviewStore | None = None,
+        developer_only: bool = False,
     ) -> None:
-        """Initialize service with project manifests, checkpoints, and reviews."""
+        """Initialize service with project manifests, checkpoints, reviews,
+        and blinding.
+        """
         self.manifest_paths: dict[str, Path] = {
             k: Path(v) for k, v in (manifest_paths or DEFAULT_MANIFEST_PATHS).items()
         }
         self.checkpoint_dir = Path(checkpoint_dir or DEFAULT_CHECKPOINT_DIR)
         self.review_store = review_store or ReviewStore()
+        self.developer_only = bool(developer_only)
 
         # In-memory caches
         self._projects: dict[str, BenchmarkProject] = {}
@@ -157,8 +167,14 @@ class TraceWiseService:
         """Return metadata for all supported retrieval and reranking methods."""
         return RETRIEVAL_METHODS_CATALOG
 
-    def get_projects(self) -> list[dict[str, Any]]:
-        """List all available benchmark projects with overview metrics."""
+    def get_projects(self, mode: str | None = None) -> list[dict[str, Any]]:
+        """List all available benchmark projects with overview metrics.
+
+        In developer mode (or when developer_only is enforced), ground-truth link
+        counts are withheld to ensure complete ground-truth isolation.
+        """
+        norm_mode = self._normalize_mode(mode)
+        is_dev = norm_mode == "developer"
         projects_summary = []
         for project_id, manifest_path in self.manifest_paths.items():
             if not manifest_path.is_file():
@@ -174,7 +190,9 @@ class TraceWiseService:
                     "num_requirements": project.num_requirements,
                     "num_source_chunks": project.num_source_chunks,
                     "num_source_files": project.num_source_files,
-                    "num_ground_truth_links": project.num_ground_truth_links,
+                    "num_ground_truth_links": (
+                        None if is_dev else project.num_ground_truth_links
+                    ),
                     "has_b5_checkpoint": checkpoint_file.is_file(),
                 }
             )
@@ -310,24 +328,52 @@ class TraceWiseService:
         )
         return [e.to_dict() for e in events]
 
-    def get_project_details(self, project_id: str) -> dict[str, Any]:
-        """Get comprehensive metadata and configuration for a specific project."""
+    def get_project_details(
+        self, project_id: str, mode: str | None = None
+    ) -> dict[str, Any]:
+        """Fetch project metadata, dataset scale, and configuration.
+
+        In developer mode (or when developer_only is enforced), ground-truth link
+        counts, evaluable requirement counts, and gold-standard annotations are
+        strictly withheld from the response payload.
+        """
+        norm_mode = self._normalize_mode(mode)
+        is_dev = norm_mode == "developer"
         project = self.get_project_instance(project_id)
         checkpoint_file = self.checkpoint_dir / f"b5_checkpoint_{project_id}.json"
         evaluable_reqs = sum(
             1 for targets in project.ground_truth.values() if len(targets) > 0
         )
 
+        metadata = dict(project.metadata)
+        if is_dev:
+            # Strip protected ground truth information from metadata
+            for key in (
+                "gold_links",
+                "evaluable_requirements",
+                "zero_link_requirements",
+                "evaluation_denominator",
+                "sha256_uc2java_csv",
+                "sha256_uc2cc_csv",
+                "description",
+            ):
+                metadata.pop(key, None)
+
         return {
             "project_id": project.project_id,
             "project_name": project.project_name,
+            "mode": norm_mode,
             "num_requirements": project.num_requirements,
-            "num_evaluable_requirements": evaluable_reqs,
-            "num_zero_link_requirements": project.num_requirements - evaluable_reqs,
+            "num_evaluable_requirements": None if is_dev else evaluable_reqs,
+            "num_zero_link_requirements": (
+                None if is_dev else (project.num_requirements - evaluable_reqs)
+            ),
             "num_source_chunks": project.num_source_chunks,
             "num_source_files": project.num_source_files,
-            "num_ground_truth_links": project.num_ground_truth_links,
-            "metadata": project.metadata,
+            "num_ground_truth_links": (
+                None if is_dev else project.num_ground_truth_links
+            ),
+            "metadata": metadata,
             "configuration": project.configuration,
             "has_b5_checkpoint": checkpoint_file.is_file(),
         }
@@ -446,10 +492,16 @@ class TraceWiseService:
             )
             return None
 
-    @staticmethod
-    def _normalize_mode(mode: str) -> str:
-        """Normalize and validate operating mode (evaluation vs. developer)."""
-        clean = (mode or "").lower().strip()
+    def _normalize_mode(self, mode: str | None = None) -> str:
+        """Normalize and validate operating mode (evaluation vs. developer).
+
+        When developer_only is enabled on this service instance, always returns
+        'developer' regardless of the requested mode to enforce ground-truth blinding.
+        """
+        if self.developer_only:
+            return "developer"
+
+        clean = (mode or "evaluation").lower().strip()
         if clean in ("evaluation", "research", "eval"):
             return "evaluation"
         if clean in ("developer", "workflow", "dev"):
@@ -637,7 +689,9 @@ class TraceWiseService:
 
             elif retriever_name in ("b2_semantic", "semantic"):
                 cand_meta.setdefault("retrieval_method", "b2_semantic")
-                cand_meta.setdefault("embedding_model", "BAAI/bge-small-en-v1.5")
+                cand_meta.setdefault(
+                    "embedding_model", "sentence-transformers/all-MiniLM-L6-v2"
+                )
                 cand_meta.setdefault("similarity_metric", "Dense Cosine Similarity")
                 cand_meta.setdefault("vector_dimension", 384)
 

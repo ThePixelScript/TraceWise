@@ -294,7 +294,7 @@ class TestCandidateEvidenceMetadata:
         cand = res["candidates"][0]
         meta = cand["metadata"]
         assert meta["retrieval_method"] == "b2_semantic"
-        assert "bge-small-en-v1.5" in meta["embedding_model"]
+        assert "all-MiniLM-L6-v2" in meta["embedding_model"]
         assert meta["similarity_metric"] == "Dense Cosine Similarity"
         assert meta["vector_dimension"] == 384
         assert "is_gold_link" not in meta
@@ -363,3 +363,102 @@ class TestCandidateEvidenceMetadata:
                 assert cand["is_gold_link"] is None
                 assert "is_gold_link" not in cand["metadata"]
                 assert "gold_links" not in cand["metadata"]
+
+    def test_b2_and_b4_catalog_metadata(self, service: TraceWiseService) -> None:
+        methods = {m["id"]: m for m in service.get_supported_methods()}
+        assert "b2_semantic" in methods
+        b2 = methods["b2_semantic"]
+        assert "all-MiniLM-L6-v2" in b2["parameters"]["model"]
+        assert "all-MiniLM-L6-v2" in b2["description"]
+
+        assert "b4_hybrid" in methods
+        b4 = methods["b4_hybrid"]
+        assert b4["parameters"]["rrf_k"] == 60
+        assert b4["parameters"]["components"] == [
+            "b0_tfidf",
+            "b2_semantic",
+            "b3_structural",
+        ]
+        assert "B0 TF-IDF" in b4["description"]
+        assert "B2 Semantic" in b4["description"]
+        assert "B3 Structural" in b4["description"]
+
+    def test_developer_only_service_enforces_blinding(self) -> None:
+        dev_service = TraceWiseService(developer_only=True)
+        assert dev_service.developer_only is True
+
+        # Mode coercion: even when client requests "evaluation", developer mode
+        # is enforced
+        projects = dev_service.get_projects(mode="evaluation")
+        for p in projects:
+            assert p["num_ground_truth_links"] is None
+
+        detail = dev_service.get_project_details("sample_project", mode="evaluation")
+        assert detail["mode"] == "developer"
+        assert detail["num_evaluable_requirements"] is None
+        assert detail["num_zero_link_requirements"] is None
+        assert detail["num_ground_truth_links"] is None
+        assert "gold_links" not in detail["metadata"]
+        assert "evaluable_requirements" not in detail["metadata"]
+        assert "zero_link_requirements" not in detail["metadata"]
+        assert "description" not in detail["metadata"]
+
+        reqs = dev_service.get_requirements("sample_project", mode="evaluation")
+        for r in reqs:
+            assert r["gold_link_count"] is None
+            assert r["is_evaluable"] is None
+
+        req_detail = dev_service.get_requirement_detail(
+            "sample_project", "REQ-001", mode="evaluation"
+        )
+        assert req_detail["mode"] == "developer"
+        assert req_detail["gold_links"] is None
+        assert req_detail["gold_link_count"] is None
+        assert req_detail["is_evaluable"] is None
+
+        cands = dev_service.get_candidates(
+            "sample_project", "REQ-001", method="b1_bm25", mode="evaluation"
+        )
+        assert cands["mode"] == "developer"
+        assert cands["gold_links_retrieved"] is None
+        assert cands["total_gold_links"] is None
+        assert cands["is_evaluable"] is None
+        assert cands["gold_link_targets"] is None
+        for c in cands["candidates"]:
+            assert c["is_gold_link"] is None
+
+    def test_standard_service_allows_research_mode(self) -> None:
+        std_service = TraceWiseService(developer_only=False)
+        assert std_service.developer_only is False
+
+        # In standard mode, research/evaluation mode exposes ground truth as designed
+        projects = std_service.get_projects(mode="evaluation")
+        sample_p = next(p for p in projects if p["project_id"] == "sample_project")
+        assert sample_p["num_ground_truth_links"] == 16
+
+        detail = std_service.get_project_details("sample_project", mode="evaluation")
+        assert detail["mode"] == "evaluation"
+        assert detail["num_ground_truth_links"] == 16
+        assert detail["num_evaluable_requirements"] == 10
+        assert detail["num_zero_link_requirements"] == 0
+
+        reqs = std_service.get_requirements("sample_project", mode="evaluation")
+        req1 = next(r for r in reqs if r["requirement_id"] == "REQ-001")
+        assert req1["gold_link_count"] == 1
+        assert req1["is_evaluable"] is True
+
+        req_detail = std_service.get_requirement_detail(
+            "sample_project", "REQ-001", mode="evaluation"
+        )
+        assert req_detail["gold_links"] == [
+            "src/auth/service.py#AuthenticationService.authenticate_user",
+        ]
+        assert req_detail["gold_link_count"] == 1
+        assert req_detail["is_evaluable"] is True
+
+        cands = std_service.get_candidates(
+            "sample_project", "REQ-001", method="b1_bm25", mode="evaluation"
+        )
+        assert cands["total_gold_links"] == 1
+        assert isinstance(cands["gold_links_retrieved"], int)
+        assert len(cands["gold_link_targets"]) == 1

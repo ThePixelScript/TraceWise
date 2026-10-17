@@ -114,7 +114,14 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
         # 1. Health check
         if path == "/api/health":
-            self._send_json(HTTPStatus.OK, {"status": "ok", "version": "0.1.0"})
+            self._send_json(
+                HTTPStatus.OK,
+                {
+                    "status": "ok",
+                    "version": "0.1.0",
+                    "developer_only": getattr(service, "developer_only", False),
+                },
+            )
             return
 
         # 2. Retrieval methods catalog
@@ -124,8 +131,9 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
         # 3. Projects list
         if path in ("/api/projects", "/api/projects/"):
+            mode = query_params.get("mode", [None])[0]
             try:
-                projects = service.get_projects()
+                projects = service.get_projects(mode=mode)
                 self._send_json(HTTPStatus.OK, projects)
             except Exception:
                 logger.exception("Error fetching projects")
@@ -140,8 +148,9 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
             # GET /api/projects/{project_id}
             if len(parts) == 3:
+                mode = query_params.get("mode", [None])[0]
                 try:
-                    detail = service.get_project_details(project_id)
+                    detail = service.get_project_details(project_id, mode=mode)
                     self._send_json(HTTPStatus.OK, detail)
                 except KeyError as exc:
                     self._send_error(HTTPStatus.NOT_FOUND, str(exc))
@@ -462,11 +471,21 @@ class TraceWiseDashboardServer:
         host: str = "127.0.0.1",
         port: int = 8000,
         service: TraceWiseService | None = None,
+        developer_only: bool = False,
     ) -> None:
-        """Initialize the dashboard server with host, port, and service instance."""
+        """Initialize dashboard server with host, port, service, and
+        developer-only flag.
+        """
         self.host = host
         self.requested_port = port
-        self.service = service or TraceWiseService()
+        self.developer_only = bool(developer_only)
+        if service is not None:
+            self.service = service
+            if self.developer_only:
+                self.service.developer_only = True
+        else:
+            self.service = TraceWiseService(developer_only=self.developer_only)
+
         self._server = ThreadingHTTPServer(
             (self.host, self.requested_port), DashboardRequestHandler
         )
