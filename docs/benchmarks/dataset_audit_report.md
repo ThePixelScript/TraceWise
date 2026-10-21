@@ -2,10 +2,10 @@
 
 **Report Version:** 1.0.0  
 **Audit Date:** October 20, 2026  
-**Auditor:** TraceWise Research & Evaluation Team (Nannan)  
+**Auditor:** TraceWise Research & Evaluation Team  
 **Base Commit Reference:** `102721a6a5fd280132d6647316041a14f3ac6031`  
 **Target Branch:** `research/dataset_audit`  
-**Downstream Reviewers:** Arun (`research/evaluation_protocol`), Divesh (`feature/evaluation_instrumentation`)
+**Downstream Reviewers:** Evaluation Protocol Team (`research/evaluation_protocol`), Instrumentation Team (`feature/evaluation_instrumentation`)
 
 ---
 
@@ -146,6 +146,10 @@ The table below compares the audited structural dimensions across all three data
   - Notice: All three `__init__.py` files contain no function or class definitions, resulting in 0 chunks extracted from them.
 * **Test Files (Excluded from Source Benchmark):**
   - 4 test files (`test_authentication.py`, `test_tokens.py`, `test_users.py`, `test_rate_limiter.py`) containing 25 test functions and 17 test trace links. These are correctly excluded from the source-code benchmark.
+* **Historical Ground-Truth Evolution & Link Count Refinement:**
+  - *Initial Revision (Commit `b39a5a7`):* The synthetic fixture originally contained 36 ground-truth link records in `trace_links.json`, comprising 19 source code links and 17 test case links. In this initial setup, whole-class container chunks were linked directly to requirements alongside their member functions (e.g., `REQ-001 -> AuthenticationResult`, `REQ-006 -> UserProfile`, `REQ-010 -> RateLimiter`).
+  - *Granularity Refinement (Commit `714010d`):* To enforce strict method/function-level AST granularity and avoid redundant dual-tier scoring between container classes and their member methods, the three class-level links were pruned. This established the canonical count of **16 source code ground-truth links** (and 33 total records including the 17 test links).
+  - *Impact on Distractor Pool:* Because `PythonChunker` extracts class definition blocks as top-level AST chunks, `AuthenticationResult`, `UserProfile`, and `RateLimiter` remain valid indexed chunks in the code corpus (part of the 26 chunks) but are unlinked in the refined ground truth, correctly forming part of the 15 unlinked distractor chunks.
 
 #### B. `iTrust` Breakdown
 * **Requirements (131 files):** Located in `data/benchmarks/itrust/UC/`. Filenames follow use-case flow nomenclature:
@@ -286,5 +290,5 @@ In compliance with project governance and legal requirements, the following dire
 
 1. **Benchmark Infrastructure Integrity:** The TraceWise ingestion, chunking, and validation pipelines are mathematically and architecturally sound.
 2. **Ground-Truth Readiness:** All 16 synthetic links, 286 iTrust links, and 308 eTour links are 100% verified against actual repository files.
-3. **Recommendation for Arun (Protocol):** The evaluation protocol must explicitly declare the denominator convention ($N=10, 105, 57$) in all published metrics to prevent confusion with full-corpus BM25 calculations.
-4. **Recommendation for Divesh (Instrumentation):** Instrumentation should log participant verification actions across both evaluable and zero-link requirements to record negative-rejection effort.
+3. **Recommendation for Evaluation Protocol:** The evaluation protocol must explicitly declare the denominator convention ($N=10, 105, 57$) in all published metrics to prevent confusion with full-corpus BM25 calculations.
+4. **Recommendation for Instrumentation Team:** Instrumentation should log participant verification actions across both evaluable and zero-link requirements to record negative-rejection effort.

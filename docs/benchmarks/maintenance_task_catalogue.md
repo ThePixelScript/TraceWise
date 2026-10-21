@@ -2,10 +2,10 @@
 
 **Catalogue Version:** 1.0.0  
 **Release Date:** October 20, 2026  
-**Auditor / Task Architect:** TraceWise Research & Evaluation Team (Nannan)  
+**Auditor / Task Architect:** TraceWise Research & Evaluation Team  
 **Base Commit Reference:** `102721a6a5fd280132d6647316041a14f3ac6031`  
 **Target Branch:** `research/dataset_audit`  
-**Intended Consumers:** Arun (`research/evaluation_protocol`), Divesh (`feature/evaluation_instrumentation`)
+**Intended Consumers:** Evaluation Protocol Team (`research/evaluation_protocol`), Instrumentation Team (`feature/evaluation_instrumentation`)
 
 ---
 
@@ -205,10 +205,10 @@ The catalogue spans three core software engineering maintenance categories:
 * **Target Requirements:** `UC10S1` (View Patient Health Records) and `UC10E1` (Invalid Medical ID Access)
 
 #### 1. Participant Scenario & Prompt
-> *"A compliance audit revealed potential unauthorized access to Patient Health Records (PHR) when navigating between patient records. Using TraceWise, investigate candidate classes retrieved for UC10S1. Identify all classes participating in PHR retrieval and patient authorization, and explain how role verification prevents healthcare personnel from accessing unassigned patients."*
+> *"A compliance audit revealed potential unauthorized access to Patient Health Records (PHR) when navigating between patient records. Using TraceWise, investigate candidate classes retrieved for both UC10S1 (View Patient Health Records) and UC10E1 (Invalid Medical ID Access). Identify all classes participating in PHR retrieval, patient authorization, and error handling for invalid patient identifiers, and explain how role verification prevents healthcare personnel from accessing unassigned patients."*
 
 #### 2. Required Participant Outputs
-1. Identify all 7 classes in the ground truth for UC10S1.
+1. Identify all ground-truth classes implementing PHR access and invalid medical ID exception handling across UC10S1 and UC10E1.
 2. Explain the role of `AuthDAO` and session verification.
 3. Identify which DAOs access patient family history vs. personal medical history.
 
@@ -248,7 +248,7 @@ The catalogue spans three core software engineering maintenance categories:
 > *"The tourism agency requires removing decommissioned cultural heritage sites. Use TraceWise to inspect candidate Java classes for requirement UC1 ('DeleteCulturalHeritage'). Identify the client manager, remote interface, and database persistence classes responsible for deleting a cultural heritage object."*
 
 #### 2. Required Participant Outputs
-1. Identify the 4 classes forming the complete vertical deletion slice.
+1. Identify all classes forming the complete vertical deletion slice.
 2. Formally accept true positives and reject data transfer objects (DTOs) or tag managers.
 
 #### 3. Source-Verified Answer Key (Evaluator Only)
@@ -342,7 +342,7 @@ The catalogue spans three core software engineering maintenance categories:
 
 ## 4. Scoring Criteria & Evaluation Rubric
 
-To provide objective, reproducible evaluations aligned with Arun's protocol and Divesh's instrumentation, participant performance is evaluated using three complementary dimensions:
+To provide objective, reproducible evaluations aligned with the evaluation protocol and instrumentation specifications, participant performance is evaluated using three complementary dimensions:
 
 ### 4.1 Information Retrieval Performance (Candidate Verification Accuracy)
 Participant review decisions (`accepted` vs. `rejected`) are mapped against the verified ground-truth answer key:

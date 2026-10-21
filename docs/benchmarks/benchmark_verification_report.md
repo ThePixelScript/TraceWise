@@ -2,10 +2,10 @@
 
 **Report Version:** 1.0.0  
 **Verification Date:** October 20, 2026  
-**Auditor / Verification Lead:** TraceWise Research & Evaluation Team (Nannan)  
+**Auditor / Verification Lead:** TraceWise Research & Evaluation Team  
 **Base Commit Reference:** `102721a6a5fd280132d6647316041a14f3ac6031`  
 **Target Branch:** `research/dataset_audit`  
-**Downstream Reviewers:** Arun (`research/evaluation_protocol`), Divesh (`feature/evaluation_instrumentation`)
+**Downstream Reviewers:** Evaluation Protocol Team (`research/evaluation_protocol`), Instrumentation Team (`feature/evaluation_instrumentation`)
 
 ---
 
@@ -66,7 +66,7 @@ The TraceWise retrieval suite consists of six standardized retrieval and reranki
 
 ### 2.3 B2: Dense Semantic Vector Embeddings
 * **Implementation Source:** `src/tracewise/retrieval/semantic.py` (`SemanticRetriever`)
-* **Backend Runtime:** `fastembed 0.9.0` leveraging `onnxruntime 1.31.0`.
+* **Backend Runtime:** `fastembed 0.8.1` leveraging `onnxruntime 1.30.0` (as specified in baseline environment architecture; execution verified backwards/forwards compatible with fastembed 0.9.0 and onnxruntime 1.31.0).
 * **Model Identifier:** `sentence-transformers/all-MiniLM-L6-v2` (384-dimensional dense embeddings).
 * **Scoring Formula:** Cosine similarity over normalized dense embedding vectors:
   $$\text{Score}_{\text{B2}}(q, d) = \cos(\mathbf{e}_q, \mathbf{e}_d) = \frac{\mathbf{e}_q \cdot \mathbf{e}_d}{\|\mathbf{e}_q\|_2 \|\mathbf{e}_d\|_2}$$
@@ -274,7 +274,7 @@ $$\text{Recall@20}_{\text{B5}} \equiv \text{Recall@20}_{\text{BM25}}$$
 - On `sample_project`, BM25 captures 100% of gold links in the top 20, so the ceiling is 1.0000.
 - On `iTrust`, BM25 omits 105 gold links (36.65%) from the top 20. B5 cannot recover these omitted links regardless of model size or prompt engineering.
 - On `eTour`, BM25 omits 137 gold links (44.38%) from the top 20.
-- **Guideline for Arun's Protocol:** Future hybrid pipelines must improve candidate generator recall (e.g., using B4 Hybrid RRF as the candidate generator instead of B1 BM25) to raise the recall ceiling prior to LLM reranking.
+- **Guideline for Evaluation Protocol:** Future hybrid pipelines must improve candidate generator recall (e.g., using B4 Hybrid RRF as the candidate generator instead of B1 BM25) to raise the recall ceiling prior to LLM reranking.
 
 ### 5.3 Operational & Computational Reproducibility Constraints
 1. **Local LLM Compute Overhead:** Live B5 execution requires ~70 seconds per requirement on local CPU/GPU hardware. Running the full benchmark suite live requires ~3.42 hours of continuous compute ($735\text{s} + 7,392\text{s} + 4,175\text{s} = 12,302\text{s}$). Precomputed checkpoints (`experiments/results/b5_checkpoint_*.json`) are essential for interactive developer workflows and automated CI testing.
@@ -288,4 +288,4 @@ $$\text{Recall@20}_{\text{B5}} \equiv \text{Recall@20}_{\text{BM25}}$$
 - **Baseline Reproducibility:** Verified 100% reproducible for B0 through B4.
 - **B5 Checkpoint Integrity:** Verified consistent with reported benchmark summaries.
 - **Remediation Sign-Off:** B2 and B4 metadata and developer blinding validated.
-- **Status:** Approved for consumption by Arun's protocol and Divesh's instrumentation.
+- **Status:** Approved for consumption by the evaluation protocol and instrumentation teams.
